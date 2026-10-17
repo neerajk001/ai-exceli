@@ -1,3 +1,4 @@
+import { AIPanel } from "./ai-panel/AIPanel";
 import { Canvas } from "./canvas/Canvas";
 import { CanvasApiProvider } from "./canvas/CanvasApiContext";
 
@@ -8,7 +9,7 @@ export function App() {
         <div className="canvas-area">
           <Canvas />
         </div>
-        <aside className="ai-panel" aria-label="AI panel" />
+        <AIPanel />
       </div>
     </CanvasApiProvider>
   );

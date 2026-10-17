@@ -38,13 +38,6 @@ body {
   width: 100%;
 }
 
-.ai-panel {
-  flex: 0 0 360px;
-  height: 100%;
-  border-left: 1px solid #2a2a30;
-  background: #161619;
-}
-
 .canvas-debug {
   position: absolute;
   bottom: 12px;
@@ -59,12 +52,87 @@ body {
   pointer-events: none;
 }
 
-.canvas-log-graph {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 10;
+.ai-panel {
+  flex: 0 0 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  padding: 16px;
+  border-left: 1px solid #2a2a30;
+  background: #161619;
+  overflow-y: auto;
+}
+
+.ai-panel-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a1a1aa;
+}
+
+.ai-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ai-mode {
   padding: 6px 10px;
+  border: 1px solid #3a3a42;
+  border-radius: 999px;
+  background: transparent;
+  color: #d4d4d8;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ai-mode[aria-pressed="true"] {
+  border-color: #6366f1;
+  background: #312e81;
+  color: #e0e7ff;
+}
+
+.ai-mode:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ai-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #3a3a42;
+  border-radius: 8px;
+  background: #0f0f12;
+  color: #f4f4f5;
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.ai-input:focus {
+  border-color: #6366f1;
+  outline: none;
+}
+
+.ai-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 30px;
+}
+
+.ai-actions button {
+  padding: 6px 12px;
   border: 1px solid #3a3a42;
   border-radius: 6px;
   background: #1c1c21;
@@ -73,6 +141,44 @@ body {
   cursor: pointer;
 }
 
-.canvas-log-graph:hover {
+.ai-actions button:hover:not(:disabled) {
   background: #26262c;
+}
+
+.ai-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ai-send {
+  border-color: #6366f1 !important;
+  background: #4f46e5 !important;
+  color: #eef2ff !important;
+}
+
+.ai-hint {
+  color: #a1a1aa;
+  font-size: 12px;
+}
+
+.ai-error {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #7f1d1d;
+  border-radius: 8px;
+  background: #2a1215;
+  color: #fecaca;
+  font-size: 13px;
+}
+
+.ai-answer {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #2a2a30;
+  border-radius: 8px;
+  background: #1c1c21;
+  color: #e4e4e7;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
 }
