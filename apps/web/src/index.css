@@ -58,3 +58,21 @@ body {
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
+
+.canvas-log-graph {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  padding: 6px 10px;
+  border: 1px solid #3a3a42;
+  border-radius: 6px;
+  background: #1c1c21;
+  color: #e4e4e7;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.canvas-log-graph:hover {
+  background: #26262c;
+}

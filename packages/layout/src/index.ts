@@ -1,3 +1,2 @@
-import { PROJECT_NAME } from "@wb/shared-types";
-
-export const LAYOUT_PLACEHOLDER = `${PROJECT_NAME}:layout`;
+export const LAYOUT_PLACEHOLDER =
+  "layout placeholder (placement and tidy arrive in v0.8)";

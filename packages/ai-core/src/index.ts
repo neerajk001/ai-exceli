@@ -1,3 +1,2 @@
-import { PROJECT_NAME } from "@wb/shared-types";
-
-export const AI_CORE_PLACEHOLDER = `${PROJECT_NAME}:ai-core`;
+export const AI_CORE_PLACEHOLDER =
+  "ai-core placeholder (prompts and modes arrive in v0.4)";

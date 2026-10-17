@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.1",
+    "@wb/scene-graph": "workspace:*",
     "@wb/shared-types": "workspace:*",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
