@@ -12,6 +12,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.1",
     "@wb/shared-types": "workspace:*",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"

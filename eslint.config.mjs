@@ -26,8 +26,9 @@ export default [
       },
     },
     rules: {
-      // The Babel parser is not type-aware, so leave unused checks to `tsc`
-      // (`noUnusedLocals` / `noUnusedParameters` in tsconfig.base.json).
+      // The Babel parser is not type-aware, so leave reference and unused
+      // checks to `tsc` (`strict` and `noUnusedLocals` in tsconfig.base.json).
+      "no-undef": "off",
       "no-unused-vars": "off",
     },
   },

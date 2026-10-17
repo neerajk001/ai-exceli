@@ -1,13 +1,15 @@
-import { PROJECT_NAME, PROJECT_VERSION } from "@wb/shared-types";
+import { Canvas } from "./canvas/Canvas";
+import { CanvasApiProvider } from "./canvas/CanvasApiContext";
 
 export function App() {
   return (
-    <main className="app">
-      <h1>{PROJECT_NAME}</h1>
-      <p>
-        Monorepo shell v{PROJECT_VERSION} — this value was imported from{" "}
-        <code>@wb/shared-types</code>.
-      </p>
-    </main>
+    <CanvasApiProvider>
+      <div className="app-shell">
+        <div className="canvas-area">
+          <Canvas />
+        </div>
+        <aside className="ai-panel" aria-label="AI panel" />
+      </div>
+    </CanvasApiProvider>
   );
 }
