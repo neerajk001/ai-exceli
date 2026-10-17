@@ -1,2 +1,9 @@
-export const AI_CORE_PLACEHOLDER =
-  "ai-core placeholder (prompts and modes arrive in v0.4)";
+export { askAI } from "./askAI";
+export {
+  createLLMClient,
+  type LLMClient,
+  type LLMEnvironment,
+  type LLMGenerateParams,
+} from "./llm";
+export { askResultSchema, buildAskPrompt, type AskResult } from "./modes/ask";
+export { SYSTEM_PROMPT } from "./prompts/system";

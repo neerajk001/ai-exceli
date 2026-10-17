@@ -12,14 +12,19 @@
     }
   },
   "scripts": {
+    "try:ask": "tsx scripts/try-ask.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@wb/shared-types": "workspace:*"
+    "@wb/shared-types": "workspace:*",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@wb/scene-graph": "workspace:*",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
   }
