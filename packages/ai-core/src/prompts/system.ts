@@ -1,3 +1,9 @@
+export type Prompt = {
+  system: string;
+  user: string;
+  jsonSchema: Record<string, unknown>;
+};
+
 export const SYSTEM_PROMPT = [
   "You are the AI assistant for a whiteboard canvas.",
   "The canvas is given to you as a small graph of nodes (shapes) and edges (connectors).",

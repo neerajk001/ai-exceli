@@ -13,6 +13,7 @@
   },
   "scripts": {
     "try:ask": "tsx scripts/try-ask.ts",
+    "try:tocode": "tsx scripts/try-tocode.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run --passWithNoTests"

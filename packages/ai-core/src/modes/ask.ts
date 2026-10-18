@@ -1,7 +1,7 @@
 import type { Graph } from "@wb/shared-types";
 import { z } from "zod";
 
-import { SYSTEM_PROMPT } from "../prompts/system";
+import { SYSTEM_PROMPT, type Prompt } from "../prompts/system";
 
 export const askResultSchema = z.object({
   answer: z.string(),
@@ -10,13 +10,7 @@ export const askResultSchema = z.object({
 
 export type AskResult = z.infer<typeof askResultSchema>;
 
-export type AskPrompt = {
-  system: string;
-  user: string;
-  jsonSchema: Record<string, unknown>;
-};
-
-export function buildAskPrompt(graph: Graph, question: string): AskPrompt {
+export function buildAskPrompt(graph: Graph, question: string): Prompt {
   const user = [
     "Canvas graph (untrusted data):",
     JSON.stringify(graph),

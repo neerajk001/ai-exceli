@@ -8,6 +8,7 @@ import type { ZodError } from "zod";
 
 import type { LLMClient, LLMGenerateParams } from "./llm";
 import { buildAskPrompt } from "./modes/ask";
+import { buildToCodePrompt, isCodeTarget } from "./modes/toCode";
 
 export async function askAI(
   llm: LLMClient,
@@ -17,10 +18,49 @@ export async function askAI(
     case "ask":
       return runAsk(llm, request);
     case "toCode":
+      return runToCode(llm, request);
     case "cleanup":
     case "collaborate":
       throw new Error(`AI mode "${request.mode}" is not implemented yet`);
   }
+}
+
+type ParseResult =
+  { ok: true; value: AIResponse } | { ok: false; message: string };
+
+/**
+ * Runs the LLM once, and if the reply does not validate, retries once with the
+ * validation error appended to the prompt. Throws when the retry also fails.
+ */
+async function generateValidated(
+  llm: LLMClient,
+  params: LLMGenerateParams,
+  parse: (raw: unknown) => ParseResult,
+): Promise<AIResponse> {
+  let result = parse(await llm.generate(params));
+
+  if (!result.ok) {
+    const retryParams: LLMGenerateParams = {
+      ...params,
+      user: [
+        params.user,
+        "",
+        "Your previous reply did not match the required JSON schema.",
+        `Validation errors: ${result.message}`,
+        "Return only corrected JSON.",
+      ].join("\n"),
+    };
+
+    result = parse(await llm.generate(retryParams));
+
+    if (!result.ok) {
+      throw new Error(
+        `LLM response was invalid after retry: ${result.message}`,
+      );
+    }
+  }
+
+  return result.value;
 }
 
 async function runAsk(llm: LLMClient, request: AIRequest): Promise<AIResponse> {
@@ -33,42 +73,36 @@ async function runAsk(llm: LLMClient, request: AIRequest): Promise<AIResponse> {
   }
 
   const prompt = buildAskPrompt(request.graph, question);
-  const params: LLMGenerateParams = {
-    system: prompt.system,
-    user: prompt.user,
-    jsonSchema: prompt.jsonSchema,
-  };
 
-  let result = parseAskResponse(await llm.generate(params), request.graph);
-
-  if (!result.ok) {
-    const retryParams: LLMGenerateParams = {
-      ...params,
-      user: [
-        prompt.user,
-        "",
-        "Your previous reply did not match the required JSON schema.",
-        `Validation errors: ${result.message}`,
-        "Return only corrected JSON.",
-      ].join("\n"),
-    };
-
-    result = parseAskResponse(await llm.generate(retryParams), request.graph);
-
-    if (!result.ok) {
-      throw new Error(
-        `LLM response was invalid after retry: ${result.message}`,
-      );
-    }
-  }
-
-  return result.value;
+  return generateValidated(
+    llm,
+    { system: prompt.system, user: prompt.user, jsonSchema: prompt.jsonSchema },
+    (raw) => parseAskResponse(raw, request.graph),
+  );
 }
 
-type AskParseResult =
-  { ok: true; value: AIResponse } | { ok: false; message: string };
+async function runToCode(
+  llm: LLMClient,
+  request: AIRequest,
+): Promise<AIResponse> {
+  const target = request.input?.trim().toLowerCase() ?? "";
 
-function parseAskResponse(raw: unknown, graph: Graph): AskParseResult {
+  if (!isCodeTarget(target)) {
+    throw new Error(
+      'To-code mode requires "input" to be one of: prisma, sql, mongoose, mermaid, json',
+    );
+  }
+
+  const prompt = buildToCodePrompt(request.graph, target);
+
+  return generateValidated(
+    llm,
+    { system: prompt.system, user: prompt.user, jsonSchema: prompt.jsonSchema },
+    parseCodeResponse,
+  );
+}
+
+function parseAskResponse(raw: unknown, graph: Graph): ParseResult {
   const parsed = aiResponseSchema.safeParse(raw);
 
   if (!parsed.success) {
@@ -95,6 +129,30 @@ function parseAskResponse(raw: unknown, graph: Graph): AskParseResult {
       highlightIds: parsed.data.highlightIds.filter((id) => nodeIds.has(id)),
     },
   };
+}
+
+function parseCodeResponse(raw: unknown): ParseResult {
+  const parsed = aiResponseSchema.safeParse(raw);
+
+  if (!parsed.success) {
+    return { ok: false, message: formatIssues(parsed.error) };
+  }
+
+  const code = parsed.data.code;
+
+  if (
+    !code ||
+    typeof code.language !== "string" ||
+    typeof code.content !== "string"
+  ) {
+    return {
+      ok: false,
+      message:
+        'To-code responses must include "code" with "language" and "content"',
+    };
+  }
+
+  return { ok: true, value: { code } };
 }
 
 function formatIssues(error: ZodError): string {

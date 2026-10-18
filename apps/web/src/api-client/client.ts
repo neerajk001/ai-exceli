@@ -20,13 +20,27 @@ export class ApiError extends Error {
   }
 }
 
-export type AskOptions = {
+export type RequestOptions = {
   signal?: AbortSignal;
 };
 
-export async function askAI(
+export function askAI(
   request: AIRequest,
-  options: AskOptions = {},
+  options: RequestOptions = {},
+): Promise<AIResponse> {
+  return postAI({ ...request, mode: "ask" }, options);
+}
+
+export function toCode(
+  request: AIRequest,
+  options: RequestOptions = {},
+): Promise<AIResponse> {
+  return postAI({ ...request, mode: "toCode" }, options);
+}
+
+async function postAI(
+  request: AIRequest,
+  options: RequestOptions,
 ): Promise<AIResponse> {
   let response: Response;
 

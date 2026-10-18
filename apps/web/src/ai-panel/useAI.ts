@@ -1,7 +1,7 @@
-import type { AIResponse, Graph } from "@wb/shared-types";
+import type { AIResponse, CodeTarget, Graph } from "@wb/shared-types";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { askAI } from "../api-client/client";
+import { askAI, toCode } from "../api-client/client";
 
 export type AIState = {
   loading: boolean;
@@ -29,8 +29,10 @@ export function useAI() {
     setState((previous) => ({ ...previous, loading: false }));
   }, []);
 
-  const ask = useCallback(
-    async (graph: Graph, input: string): Promise<AIResponse | null> => {
+  const run = useCallback(
+    async (
+      invoke: (signal: AbortSignal) => Promise<AIResponse>,
+    ): Promise<AIResponse | null> => {
       controllerRef.current?.abort();
 
       const controller = new AbortController();
@@ -38,10 +40,7 @@ export function useAI() {
       setState({ loading: true, error: null, result: null });
 
       try {
-        const result = await askAI(
-          { mode: "ask", graph, input },
-          { signal: controller.signal },
-        );
+        const result = await invoke(controller.signal);
 
         setState({ loading: false, error: null, result });
         return result;
@@ -68,5 +67,21 @@ export function useAI() {
     [],
   );
 
-  return { ...state, ask, cancel };
+  const ask = useCallback(
+    (graph: Graph, question: string) =>
+      run((signal) =>
+        askAI({ mode: "ask", graph, input: question }, { signal }),
+      ),
+    [run],
+  );
+
+  const generateCode = useCallback(
+    (graph: Graph, target: CodeTarget) =>
+      run((signal) =>
+        toCode({ mode: "toCode", graph, input: target }, { signal }),
+      ),
+    [run],
+  );
+
+  return { ...state, ask, toCode: generateCode, cancel };
 }

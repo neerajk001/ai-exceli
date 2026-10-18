@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   aiRequestSchema,
   aiResponseSchema,
+  codeTargetSchema,
   edgeSchema,
   graphSchema,
   newNodeSchema,
@@ -126,6 +127,18 @@ describe("opSchema", () => {
 
   it("rejects an unknown op type", () => {
     expect(opSchema.safeParse({ type: "move", id: "a" }).success).toBe(false);
+  });
+});
+
+describe("codeTargetSchema", () => {
+  it("accepts every supported target", () => {
+    for (const target of ["prisma", "sql", "mongoose", "mermaid", "json"]) {
+      expect(codeTargetSchema.safeParse(target).success).toBe(true);
+    }
+  });
+
+  it("rejects an unknown target", () => {
+    expect(codeTargetSchema.safeParse("cobol").success).toBe(false);
   });
 });
 

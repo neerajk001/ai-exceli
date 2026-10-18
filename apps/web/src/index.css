@@ -182,3 +182,82 @@ body {
   line-height: 1.5;
   white-space: pre-wrap;
 }
+
+.ai-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ai-field-label {
+  color: #a1a1aa;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ai-target {
+  padding: 8px;
+  border: 1px solid #3a3a42;
+  border-radius: 8px;
+  background: #0f0f12;
+  color: #f4f4f5;
+  font: inherit;
+  font-size: 13px;
+}
+
+.code-panel {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #2a2a30;
+  border-radius: 8px;
+  background: #0f0f12;
+  overflow: hidden;
+}
+
+.code-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid #2a2a30;
+  background: #1c1c21;
+}
+
+.code-panel-language {
+  color: #a1a1aa;
+  font-size: 12px;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+.code-panel-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.code-panel-actions button {
+  padding: 4px 10px;
+  border: 1px solid #3a3a42;
+  border-radius: 6px;
+  background: #26262c;
+  color: #e4e4e7;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.code-panel-actions button:hover {
+  background: #32323a;
+}
+
+.code-panel-content {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 50vh;
+  overflow: auto;
+  color: #d4d4d8;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+}

@@ -6,4 +6,9 @@ export {
   type LLMGenerateParams,
 } from "./llm";
 export { askResultSchema, buildAskPrompt, type AskResult } from "./modes/ask";
-export { SYSTEM_PROMPT } from "./prompts/system";
+export {
+  buildToCodePrompt,
+  codeResultSchema,
+  isCodeTarget,
+} from "./modes/toCode";
+export { SYSTEM_PROMPT, type Prompt } from "./prompts/system";

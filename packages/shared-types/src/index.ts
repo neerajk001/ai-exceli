@@ -61,6 +61,16 @@ export const opSchema = z.discriminatedUnion("type", [
 
 export const aiModeSchema = z.enum(["ask", "toCode", "cleanup", "collaborate"]);
 
+export const CODE_TARGETS = [
+  "prisma",
+  "sql",
+  "mongoose",
+  "mermaid",
+  "json",
+] as const;
+
+export const codeTargetSchema = z.enum(CODE_TARGETS);
+
 export const aiRequestSchema = z.object({
   mode: aiModeSchema,
   graph: graphSchema,
@@ -88,6 +98,7 @@ export type NewEdge = z.infer<typeof newEdgeSchema>;
 export type Graph = z.infer<typeof graphSchema>;
 export type Op = z.infer<typeof opSchema>;
 export type AIMode = z.infer<typeof aiModeSchema>;
+export type CodeTarget = z.infer<typeof codeTargetSchema>;
 export type AIRequest = z.infer<typeof aiRequestSchema>;
 export type AIResponse = z.infer<typeof aiResponseSchema>;
 export type Code = z.infer<typeof codeSchema>;

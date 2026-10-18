@@ -6,6 +6,7 @@ import boundLabelsFixture from "./fixtures/bound-labels.json";
 import danglingArrowFixture from "./fixtures/dangling-arrow.json";
 import flowchartFixture from "./fixtures/flowchart-10.json";
 import freedrawFixture from "./fixtures/freedraw.json";
+import erFixture from "./fixtures/users-posts-comments.json";
 
 const asElements = (fixture: unknown): readonly ExcalidrawElement[] =>
   fixture as ExcalidrawElement[];
@@ -14,6 +15,7 @@ const flowchart = asElements(flowchartFixture);
 const boundLabels = asElements(boundLabelsFixture);
 const danglingArrow = asElements(danglingArrowFixture);
 const freedraw = asElements(freedrawFixture);
+const erDiagram = asElements(erFixture);
 
 describe("excalidrawToGraph", () => {
   describe("flowchart with 10 shapes and 10 arrows", () => {
@@ -144,6 +146,35 @@ describe("excalidrawToGraph", () => {
       const graph = excalidrawToGraph(deleted);
       expect(graph.nodes).toHaveLength(2);
       expect(graph.nodes.some((node) => node.id === target?.id)).toBe(false);
+    });
+  });
+
+  describe("entity-relationship example (users / posts / comments)", () => {
+    const graph = excalidrawToGraph(erDiagram);
+
+    it("maps the three entities with their fields", () => {
+      expect(graph.nodes).toHaveLength(3);
+      expect(
+        graph.nodes.find((node) => node.text?.startsWith("users"))?.text,
+      ).toContain("email string");
+      expect(
+        graph.nodes.find((node) => node.text?.startsWith("posts"))?.text,
+      ).toContain("user_id int");
+      expect(
+        graph.nodes.find((node) => node.text?.startsWith("comments"))?.text,
+      ).toContain("post_id int");
+    });
+
+    it("maps the three relationships with their cardinality labels", () => {
+      expect(graph.edges).toHaveLength(3);
+      expect(graph.edges.every((edge) => edge.label === "1:N")).toBe(true);
+    });
+
+    it("stays under 15% of the raw elements JSON", () => {
+      const live = erDiagram.filter((element) => !element.isDeleted);
+      const ratio = JSON.stringify(graph).length / JSON.stringify(live).length;
+
+      expect(ratio).toBeLessThan(0.15);
     });
   });
 

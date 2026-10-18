@@ -1,13 +1,15 @@
 import { excalidrawToGraph } from "@wb/scene-graph";
+import { CODE_TARGETS, type CodeTarget } from "@wb/shared-types";
 import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import { useCanvasApi } from "../canvas/CanvasApiContext";
 import { highlightElements } from "../canvas/highlight";
+import { CodePanel } from "./CodePanel";
 import { useAI } from "./useAI";
 
 const MODES = [
   { id: "ask", label: "Ask", enabled: true },
-  { id: "toCode", label: "To code", enabled: false },
+  { id: "toCode", label: "To code", enabled: true },
   { id: "cleanup", label: "Clean up", enabled: false },
   { id: "collaborate", label: "Collaborate", enabled: false },
 ] as const;
@@ -16,8 +18,9 @@ type ModeId = (typeof MODES)[number]["id"];
 
 export function AIPanel() {
   const api = useCanvasApi();
-  const { loading, error, result, ask, cancel } = useAI();
+  const { loading, error, result, ask, toCode, cancel } = useAI();
   const [mode, setMode] = useState<ModeId>("ask");
+  const [target, setTarget] = useState<CodeTarget>("prisma");
   const [input, setInput] = useState("");
   const [hint, setHint] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -27,9 +30,7 @@ export function AIPanel() {
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
 
-    const question = input.trim();
-
-    if (!question || loading || !selectedMode?.enabled) {
+    if (loading || !selectedMode?.enabled) {
       return;
     }
 
@@ -46,6 +47,17 @@ export function AIPanel() {
     }
 
     setHint(null);
+
+    if (mode === "toCode") {
+      await toCode(graph, target);
+      return;
+    }
+
+    const question = input.trim();
+
+    if (!question) {
+      return;
+    }
 
     const response = await ask(graph, question);
 
@@ -86,15 +98,33 @@ export function AIPanel() {
       ) : null}
 
       <form ref={formRef} className="ai-form" onSubmit={handleSubmit}>
-        <textarea
-          className="ai-input"
-          value={input}
-          rows={3}
-          placeholder='Ask about your canvas, e.g. "what connects to the database?"'
-          disabled={loading}
-          onChange={(event) => setInput(event.target.value)}
-          onKeyDown={handleKeyDown}
-        />
+        {mode === "toCode" ? (
+          <label className="ai-field">
+            <span className="ai-field-label">Target</span>
+            <select
+              className="ai-target"
+              value={target}
+              disabled={loading}
+              onChange={(event) => setTarget(event.target.value as CodeTarget)}
+            >
+              {CODE_TARGETS.map((candidate) => (
+                <option key={candidate} value={candidate}>
+                  {candidate}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <textarea
+            className="ai-input"
+            value={input}
+            rows={3}
+            placeholder='Ask about your canvas, e.g. "what connects to the database?"'
+            disabled={loading}
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+        )}
 
         <div className="ai-actions">
           {hint ? <span className="ai-hint">{hint}</span> : <span />}
@@ -103,8 +133,12 @@ export function AIPanel() {
               Cancel
             </button>
           ) : (
-            <button type="submit" className="ai-send" disabled={!input.trim()}>
-              Send
+            <button
+              type="submit"
+              className="ai-send"
+              disabled={mode === "ask" && !input.trim()}
+            >
+              {mode === "toCode" ? "Generate" : "Send"}
             </button>
           )}
         </div>
@@ -116,7 +150,11 @@ export function AIPanel() {
         </p>
       ) : null}
 
-      {result?.answer ? <p className="ai-answer">{result.answer}</p> : null}
+      {result?.code ? <CodePanel code={result.code} /> : null}
+
+      {!result?.code && result?.answer ? (
+        <p className="ai-answer">{result.answer}</p>
+      ) : null}
     </aside>
   );
 }

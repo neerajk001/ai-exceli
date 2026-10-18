@@ -145,7 +145,7 @@ describe("askAI (ask mode)", () => {
     await expect(askAI(client, { mode: "cleanup", graph })).rejects.toThrow(
       /not implemented/i,
     );
-    await expect(askAI(client, { mode: "toCode", graph })).rejects.toThrow(
+    await expect(askAI(client, { mode: "collaborate", graph })).rejects.toThrow(
       /not implemented/i,
     );
   });

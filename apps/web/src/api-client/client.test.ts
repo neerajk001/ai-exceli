@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, askAI } from "./client";
+import { ApiError, askAI, toCode } from "./client";
 
 const request = {
   mode: "ask" as const,
@@ -8,7 +8,9 @@ const request = {
   input: "q",
 };
 
-function mockFetch(impl: (input: RequestInfo | URL) => Promise<Response>) {
+function mockFetch(
+  impl: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+) {
   vi.stubGlobal("fetch", vi.fn(impl));
 }
 
@@ -73,6 +75,26 @@ describe("askAI (api client)", () => {
     const error = await askAI(request).catch((caught: unknown) => caught);
 
     expect((error as ApiError).code).toBe("invalid_response");
+  });
+
+  it("sends toCode requests with the toCode mode", async () => {
+    let sentBody: unknown;
+    mockFetch(async (_input, init) => {
+      sentBody = JSON.parse(String(init?.body ?? "{}"));
+      return new Response(
+        JSON.stringify({ code: { language: "sql", content: "SELECT 1;" } }),
+        { status: 200 },
+      );
+    });
+
+    const response = await toCode({
+      mode: "toCode",
+      graph: { nodes: [], edges: [] },
+      input: "sql",
+    });
+
+    expect(sentBody).toMatchObject({ mode: "toCode", input: "sql" });
+    expect(response.code?.language).toBe("sql");
   });
 
   it("lets abort errors propagate untouched", async () => {
