@@ -12,6 +12,11 @@ export {
   isCodeTarget,
 } from "./modes/toCode";
 export {
+  buildCollaboratePrompt,
+  collaborateResultSchema,
+  MAX_COLLAB_OPS,
+} from "./modes/collaborate";
+export {
   buildCleanupPrompt,
   buildVisionCleanupPrompt,
   cleanupResultSchema,

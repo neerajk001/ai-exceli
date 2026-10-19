@@ -45,6 +45,13 @@ export function cleanup(
   return postAI({ ...request, mode: "cleanup" }, options);
 }
 
+export function collaborate(
+  request: AIRequest,
+  options: RequestOptions = {},
+): Promise<AIResponse> {
+  return postAI({ ...request, mode: "collaborate" }, options);
+}
+
 async function postAI(
   request: AIRequest,
   options: RequestOptions,

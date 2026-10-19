@@ -162,7 +162,31 @@ describe("POST /ai", () => {
     expect(response.body.error.code).toBe("payload_too_large");
   });
 
-  it("returns 500 when a mode is not implemented yet", async () => {
+  it("returns ops and the narration for collaborate mode", async () => {
+    const collaborateLlm: LLMClient = {
+      async generate() {
+        return {
+          ops: [
+            {
+              type: "add_node",
+              node: { id: "new_1", kind: "rectangle", text: "Cache" },
+            },
+          ],
+          answer: "Added a cache box.",
+        };
+      },
+    };
+
+    const response = await request(appWith(collaborateLlm))
+      .post("/ai")
+      .send({ mode: "collaborate", graph, input: "add a cache" });
+
+    expect(response.status).toBe(200);
+    expect(response.body.answer).toBe("Added a cache box.");
+    expect(response.body.ops).toHaveLength(1);
+  });
+
+  it("returns 500 when collaborate has no instruction", async () => {
     const response = await request(appWith(answeringLlm))
       .post("/ai")
       .send({ mode: "collaborate", graph });

@@ -156,6 +156,12 @@ body {
   color: #eef2ff !important;
 }
 
+.ai-checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .ai-checkbox {
   display: flex;
   align-items: center;

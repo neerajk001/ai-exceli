@@ -2,13 +2,16 @@ import { CaptureUpdateAction } from "@excalidraw/excalidraw";
 import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import { placeNewNodes, tidy } from "@wb/layout";
 import { applyOps, excalidrawToGraph } from "@wb/scene-graph";
+import { CODE_TARGETS, type CodeTarget, type Op } from "@wb/shared-types";
 import {
-  CODE_TARGETS,
-  type CodeTarget,
-  type Op,
-} from "@wb/shared-types";
-import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 
+import { playOps } from "../ai-cursor/playOps";
 import { useCanvasApi } from "../canvas/CanvasApiContext";
 import { exportSceneImageBase64 } from "../canvas/exportImage";
 import { highlightElements } from "../canvas/highlight";
@@ -19,27 +22,83 @@ const MODES = [
   { id: "ask", label: "Ask", enabled: true },
   { id: "toCode", label: "To code", enabled: true },
   { id: "cleanup", label: "Clean up", enabled: true },
-  { id: "collaborate", label: "Collaborate", enabled: false },
+  { id: "collaborate", label: "Collaborate", enabled: true },
 ] as const;
 
 type ModeId = (typeof MODES)[number]["id"];
 
+const SEND_LABELS: Record<ModeId, string> = {
+  ask: "Send",
+  toCode: "Generate",
+  cleanup: "Clean up",
+  collaborate: "Draw",
+};
+
 export function AIPanel() {
   const api = useCanvasApi();
-  const { loading, error, result, ask, toCode, cleanup, cancel } = useAI();
+  const { loading, error, result, ask, toCode, cleanup, collaborate, cancel } =
+    useAI();
   const [mode, setMode] = useState<ModeId>("ask");
   const [target, setTarget] = useState<CodeTarget>("prisma");
   const [input, setInput] = useState("");
   const [recognizeStrokes, setRecognizeStrokes] = useState(false);
+  const [watchAI, setWatchAI] = useState(false);
+  const [playing, setPlaying] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
+  const playbackRef = useRef<AbortController | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   const selectedMode = MODES.find((candidate) => candidate.id === mode);
+  const busy = loading || playing;
+
+  useEffect(() => {
+    if (!playing) {
+      return undefined;
+    }
+
+    const handleEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        playbackRef.current?.abort();
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [playing]);
+
+  const startPlayback = async (ops: Op[]) => {
+    if (!api || ops.length === 0) {
+      return;
+    }
+
+    const controller = new AbortController();
+    playbackRef.current = controller;
+    setPlaying(true);
+    setHint("AI is drawing...");
+
+    try {
+      const played = await playOps({ api, ops, signal: controller.signal });
+
+      if (played.cancelled) {
+        setHint(`stopped after ${played.applied} ops`);
+      } else {
+        const skipped =
+          played.skipped > 0 ? `, skipped ${played.skipped}` : "";
+        setHint(`applied ${played.applied} ops${skipped}`);
+      }
+    } catch {
+      setHint("Playback failed.");
+    } finally {
+      playbackRef.current = null;
+      setPlaying(false);
+    }
+  };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
 
-    if (loading || !selectedMode?.enabled) {
+    if (busy || !selectedMode?.enabled) {
       return;
     }
 
@@ -59,6 +118,22 @@ export function AIPanel() {
 
     if (mode === "toCode") {
       await toCode(graph, target);
+      return;
+    }
+
+    if (mode === "collaborate") {
+      const instruction = input.trim();
+
+      if (!instruction) {
+        return;
+      }
+
+      const response = await collaborate(graph, instruction);
+
+      if (response?.ops?.length) {
+        await startPlayback(response.ops);
+      }
+
       return;
     }
 
@@ -88,6 +163,11 @@ export function AIPanel() {
 
       if (ops.length === 0) {
         setHint("Nothing to clean up.");
+        return;
+      }
+
+      if (watchAI) {
+        await startPlayback(ops);
         return;
       }
 
@@ -129,8 +209,12 @@ export function AIPanel() {
     }
   };
 
-  const sendLabel =
-    mode === "toCode" ? "Generate" : mode === "cleanup" ? "Clean up" : "Send";
+  const placeholder =
+    mode === "collaborate"
+      ? 'e.g. "add a cache between the API and the DB"'
+      : 'Ask about your canvas, e.g. "what connects to the database?"';
+
+  const needsInput = mode === "ask" || mode === "collaborate";
 
   return (
     <aside className="ai-panel" aria-label="AI panel">
@@ -143,7 +227,7 @@ export function AIPanel() {
             type="button"
             className="ai-mode"
             aria-pressed={candidate.id === mode}
-            disabled={!candidate.enabled}
+            disabled={!candidate.enabled || playing}
             title={candidate.enabled ? undefined : "Coming soon"}
             onClick={() => setMode(candidate.id)}
           >
@@ -163,7 +247,7 @@ export function AIPanel() {
             <select
               className="ai-target"
               value={target}
-              disabled={loading}
+              disabled={busy}
               onChange={(event) => setTarget(event.target.value as CodeTarget)}
             >
               {CODE_TARGETS.map((candidate) => (
@@ -174,22 +258,33 @@ export function AIPanel() {
             </select>
           </label>
         ) : mode === "cleanup" ? (
-          <label className="ai-checkbox">
-            <input
-              type="checkbox"
-              checked={recognizeStrokes}
-              disabled={loading}
-              onChange={(event) => setRecognizeStrokes(event.target.checked)}
-            />
-            <span>Recognize freehand strokes (sends a canvas image)</span>
-          </label>
+          <div className="ai-checkboxes">
+            <label className="ai-checkbox">
+              <input
+                type="checkbox"
+                checked={recognizeStrokes}
+                disabled={busy}
+                onChange={(event) => setRecognizeStrokes(event.target.checked)}
+              />
+              <span>Recognize freehand strokes (sends a canvas image)</span>
+            </label>
+            <label className="ai-checkbox">
+              <input
+                type="checkbox"
+                checked={watchAI}
+                disabled={busy}
+                onChange={(event) => setWatchAI(event.target.checked)}
+              />
+              <span>Watch AI work</span>
+            </label>
+          </div>
         ) : (
           <textarea
             className="ai-input"
             value={input}
             rows={3}
-            placeholder='Ask about your canvas, e.g. "what connects to the database?"'
-            disabled={loading}
+            placeholder={placeholder}
+            disabled={busy}
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={handleKeyDown}
           />
@@ -197,7 +292,15 @@ export function AIPanel() {
 
         <div className="ai-actions">
           {hint ? <span className="ai-hint">{hint}</span> : <span />}
-          {loading ? (
+          {playing ? (
+            <button
+              type="button"
+              className="ai-cancel"
+              onClick={() => playbackRef.current?.abort()}
+            >
+              Stop
+            </button>
+          ) : loading ? (
             <button type="button" className="ai-cancel" onClick={cancel}>
               Cancel
             </button>
@@ -205,9 +308,9 @@ export function AIPanel() {
             <button
               type="submit"
               className="ai-send"
-              disabled={mode === "ask" && !input.trim()}
+              disabled={needsInput && !input.trim()}
             >
-              {sendLabel}
+              {SEND_LABELS[mode]}
             </button>
           )}
         </div>

@@ -11,6 +11,10 @@ import type { ZodError } from "zod";
 import type { LLMClient, LLMGenerateParams } from "./llm";
 import { buildAskPrompt } from "./modes/ask";
 import {
+  buildCollaboratePrompt,
+  MAX_COLLAB_OPS,
+} from "./modes/collaborate";
+import {
   buildCleanupPrompt,
   buildVisionCleanupPrompt,
 } from "./modes/cleanup";
@@ -34,7 +38,7 @@ export async function askAI(
     case "cleanup":
       return runCleanup(llm, request);
     case "collaborate":
-      throw new Error(`AI mode "${request.mode}" is not implemented yet`);
+      return runCollaborate(llm, request);
   }
 }
 
@@ -115,6 +119,27 @@ async function runToCode(
   );
 }
 
+async function runCollaborate(
+  llm: LLMClient,
+  request: AIRequest,
+): Promise<AIResponse> {
+  const instruction = request.input?.trim();
+
+  if (!instruction) {
+    throw new Error(
+      'Collaborate mode requires "input" (the instruction to draw)',
+    );
+  }
+
+  const prompt = buildCollaboratePrompt(request.graph, instruction);
+
+  return generateValidated(
+    llm,
+    { system: prompt.system, user: prompt.user, jsonSchema: prompt.jsonSchema },
+    (raw) => parseCollaborateResponse(raw, request.graph),
+  );
+}
+
 async function runCleanup(
   llm: LLMClient,
   request: AIRequest,
@@ -189,6 +214,65 @@ function parseCodeResponse(raw: unknown): ParseResult {
   }
 
   return { ok: true, value: { code } };
+}
+
+function parseCollaborateResponse(raw: unknown, graph: Graph): ParseResult {
+  const parsed = aiResponseSchema.safeParse(raw);
+
+  if (!parsed.success) {
+    return { ok: false, message: formatIssues(parsed.error) };
+  }
+
+  if (!Array.isArray(parsed.data.ops)) {
+    return { ok: false, message: '"ops" must be an array of ops' };
+  }
+
+  if (
+    typeof parsed.data.answer !== "string" ||
+    parsed.data.answer.length === 0
+  ) {
+    return { ok: false, message: '"answer" must be a short narration string' };
+  }
+
+  return {
+    ok: true,
+    value: {
+      ops: sanitizeCollaborateOps(parsed.data.ops, graph),
+      answer: parsed.data.answer,
+    },
+  };
+}
+
+function sanitizeCollaborateOps(ops: Op[], graph: Graph): Op[] {
+  const nodeIds = new Set(graph.nodes.map((node) => node.id));
+  const newIds = new Set<string>();
+
+  for (const op of ops) {
+    if (op.type === "add_node") {
+      newIds.add(op.node.id);
+    }
+  }
+
+  const known = (id: string) => nodeIds.has(id) || newIds.has(id);
+  const kept: Op[] = [];
+
+  for (const op of ops) {
+    if (kept.length >= MAX_COLLAB_OPS) {
+      break;
+    }
+
+    if (op.type === "add_node") {
+      kept.push(op);
+    } else if (op.type === "add_edge") {
+      if (known(op.edge.from) && known(op.edge.to)) {
+        kept.push(op);
+      }
+    } else if (known(op.id)) {
+      kept.push(op);
+    }
+  }
+
+  return kept;
 }
 
 function parseCleanupResponse(raw: unknown, graph: Graph): ParseResult {

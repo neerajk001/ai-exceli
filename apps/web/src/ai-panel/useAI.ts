@@ -1,7 +1,12 @@
 import type { AIResponse, CodeTarget, Graph } from "@wb/shared-types";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { askAI, cleanup as cleanupAI, toCode } from "../api-client/client";
+import {
+  askAI,
+  cleanup as cleanupAI,
+  collaborate as collaborateAI,
+  toCode,
+} from "../api-client/client";
 
 export type AIState = {
   loading: boolean;
@@ -98,5 +103,23 @@ export function useAI() {
     [run],
   );
 
-  return { ...state, ask, toCode: generateCode, cleanup, cancel };
+  const collaborate = useCallback(
+    (graph: Graph, instruction: string) =>
+      run((signal) =>
+        collaborateAI(
+          { mode: "collaborate", graph, input: instruction },
+          { signal },
+        ),
+      ),
+    [run],
+  );
+
+  return {
+    ...state,
+    ask,
+    toCode: generateCode,
+    cleanup,
+    collaborate,
+    cancel,
+  };
 }

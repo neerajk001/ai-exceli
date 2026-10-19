@@ -139,11 +139,4 @@ describe("askAI (ask mode)", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("rejects modes that are not implemented yet", async () => {
-    const { client } = mockClient([{ answer: "x", highlightIds: [] }]);
-
-    await expect(askAI(client, { mode: "collaborate", graph })).rejects.toThrow(
-      /not implemented/i,
-    );
-  });
 });
