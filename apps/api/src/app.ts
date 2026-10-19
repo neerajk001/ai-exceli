@@ -15,7 +15,7 @@ export function createApp({ llm, webOrigin }: AppDependencies): Express {
   const app = express();
 
   app.use(cors({ origin: webOrigin }));
-  app.use(express.json({ limit: "2mb" }));
+  app.use(express.json({ limit: "4mb" }));
   app.use(
     rateLimit({
       windowMs: 60_000,

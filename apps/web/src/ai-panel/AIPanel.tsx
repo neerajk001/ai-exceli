@@ -1,8 +1,16 @@
-import { excalidrawToGraph } from "@wb/scene-graph";
-import { CODE_TARGETS, type CodeTarget } from "@wb/shared-types";
+import { CaptureUpdateAction } from "@excalidraw/excalidraw";
+import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
+import { placeNewNodes, tidy } from "@wb/layout";
+import { applyOps, excalidrawToGraph } from "@wb/scene-graph";
+import {
+  CODE_TARGETS,
+  type CodeTarget,
+  type Op,
+} from "@wb/shared-types";
 import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import { useCanvasApi } from "../canvas/CanvasApiContext";
+import { exportSceneImageBase64 } from "../canvas/exportImage";
 import { highlightElements } from "../canvas/highlight";
 import { CodePanel } from "./CodePanel";
 import { useAI } from "./useAI";
@@ -10,7 +18,7 @@ import { useAI } from "./useAI";
 const MODES = [
   { id: "ask", label: "Ask", enabled: true },
   { id: "toCode", label: "To code", enabled: true },
-  { id: "cleanup", label: "Clean up", enabled: false },
+  { id: "cleanup", label: "Clean up", enabled: true },
   { id: "collaborate", label: "Collaborate", enabled: false },
 ] as const;
 
@@ -18,10 +26,11 @@ type ModeId = (typeof MODES)[number]["id"];
 
 export function AIPanel() {
   const api = useCanvasApi();
-  const { loading, error, result, ask, toCode, cancel } = useAI();
+  const { loading, error, result, ask, toCode, cleanup, cancel } = useAI();
   const [mode, setMode] = useState<ModeId>("ask");
   const [target, setTarget] = useState<CodeTarget>("prisma");
   const [input, setInput] = useState("");
+  const [recognizeStrokes, setRecognizeStrokes] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -53,6 +62,53 @@ export function AIPanel() {
       return;
     }
 
+    if (mode === "cleanup") {
+      let imageBase64: string | undefined;
+
+      if (recognizeStrokes) {
+        setHint("Exporting the canvas...");
+
+        try {
+          imageBase64 = await exportSceneImageBase64(api);
+        } catch {
+          setHint("Could not export the canvas image.");
+          return;
+        }
+      }
+
+      const response = await cleanup(graph, imageBase64);
+
+      if (!response) {
+        setHint(null);
+        return;
+      }
+
+      const tidyOps = tidy(graph);
+      const ops: Op[] = [...(response.ops ?? []), ...tidyOps];
+
+      if (ops.length === 0) {
+        setHint("Nothing to clean up.");
+        return;
+      }
+
+      const applied = applyOps(api.getSceneElements(), ops, {
+        layout: placeNewNodes,
+        preserveGivenGeometry: true,
+      });
+
+      api.updateScene({
+        elements: applied.elements as unknown as OrderedExcalidrawElement[],
+        captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+      });
+
+      const skipped =
+        applied.skipped.length > 0 ? `, skipped ${applied.skipped.length}` : "";
+      setHint(
+        `applied ${ops.length - applied.skipped.length}/${ops.length} ops${skipped}`,
+      );
+      return;
+    }
+
     const question = input.trim();
 
     if (!question) {
@@ -72,6 +128,9 @@ export function AIPanel() {
       formRef.current?.requestSubmit();
     }
   };
+
+  const sendLabel =
+    mode === "toCode" ? "Generate" : mode === "cleanup" ? "Clean up" : "Send";
 
   return (
     <aside className="ai-panel" aria-label="AI panel">
@@ -114,6 +173,16 @@ export function AIPanel() {
               ))}
             </select>
           </label>
+        ) : mode === "cleanup" ? (
+          <label className="ai-checkbox">
+            <input
+              type="checkbox"
+              checked={recognizeStrokes}
+              disabled={loading}
+              onChange={(event) => setRecognizeStrokes(event.target.checked)}
+            />
+            <span>Recognize freehand strokes (sends a canvas image)</span>
+          </label>
         ) : (
           <textarea
             className="ai-input"
@@ -138,7 +207,7 @@ export function AIPanel() {
               className="ai-send"
               disabled={mode === "ask" && !input.trim()}
             >
-              {mode === "toCode" ? "Generate" : "Send"}
+              {sendLabel}
             </button>
           )}
         </div>

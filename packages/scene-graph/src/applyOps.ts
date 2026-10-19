@@ -11,6 +11,7 @@ import { excalidrawToGraph } from "./excalidrawToGraph";
 
 export type ApplyOpsOptions = {
   layout: LayoutFunction;
+  preserveGivenGeometry?: boolean;
 };
 
 export type SkippedOp = {
@@ -103,13 +104,19 @@ export function applyOps(
   };
 
   if (newNodes.length > 0 || newEdges.length > 0) {
+    const givenNodes = options.preserveGivenGeometry
+      ? newNodes.filter(hasFullGeometry)
+      : [];
+    const nodesToPlace = options.preserveGivenGeometry
+      ? newNodes.filter((node) => !hasFullGeometry(node))
+      : newNodes;
     const placedNodes = options.layout(
       excalidrawToGraph(elements),
-      newNodes,
+      nodesToPlace,
       newEdges,
     );
 
-    for (const node of placedNodes) {
+    for (const node of [...placedNodes, ...givenNodes]) {
       const id = createId();
       idMap.set(node.id, id);
 
@@ -415,6 +422,15 @@ function cloneElement(element: ExcalidrawElement): ExcalidrawElement {
       ? [...element.boundElements]
       : element.boundElements,
   } as ExcalidrawElement;
+}
+
+function hasFullGeometry(node: NewNode): boolean {
+  return (
+    node.x !== undefined &&
+    node.y !== undefined &&
+    node.width !== undefined &&
+    node.height !== undefined
+  );
 }
 
 function resolveId(

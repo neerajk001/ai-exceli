@@ -108,10 +108,64 @@ describe("POST /ai", () => {
     expect(JSON.stringify(response.body)).not.toContain("provider exploded");
   });
 
+  it("returns 200 with ops for cleanup mode", async () => {
+    const cleanupLlm: LLMClient = {
+      async generate() {
+        return {
+          ops: [{ type: "update_node", id: "a", patch: { kind: "diamond" } }],
+        };
+      },
+    };
+
+    const response = await request(appWith(cleanupLlm))
+      .post("/ai")
+      .send({ mode: "cleanup", graph });
+
+    expect(response.status).toBe(200);
+    expect(response.body.ops).toEqual([
+      { type: "update_node", id: "a", patch: { kind: "diamond" } },
+    ]);
+  });
+
+  it("returns 400 when an image is sent with a non-cleanup mode", async () => {
+    const response = await request(appWith(answeringLlm))
+      .post("/ai")
+      .send({ mode: "ask", graph, input: "?", imageBase64: "aGVsbG8=" });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("invalid_request");
+  });
+
+  it("returns 413 when imageBase64 exceeds the character limit", async () => {
+    const response = await request(appWith(answeringLlm))
+      .post("/ai")
+      .send({
+        mode: "cleanup",
+        graph,
+        imageBase64: "a".repeat(3_000_001),
+      });
+
+    expect(response.status).toBe(413);
+    expect(response.body.error.code).toBe("image_too_large");
+  });
+
+  it("returns 413 when the body exceeds the limit", async () => {
+    const response = await request(appWith(answeringLlm))
+      .post("/ai")
+      .send({
+        mode: "cleanup",
+        graph,
+        imageBase64: "a".repeat(4_500_000),
+      });
+
+    expect(response.status).toBe(413);
+    expect(response.body.error.code).toBe("payload_too_large");
+  });
+
   it("returns 500 when a mode is not implemented yet", async () => {
     const response = await request(appWith(answeringLlm))
       .post("/ai")
-      .send({ mode: "cleanup", graph });
+      .send({ mode: "collaborate", graph });
 
     expect(response.status).toBe(500);
     expect(response.body.error.code).toBe("internal_error");

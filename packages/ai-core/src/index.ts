@@ -11,4 +11,9 @@ export {
   codeResultSchema,
   isCodeTarget,
 } from "./modes/toCode";
+export {
+  buildCleanupPrompt,
+  buildVisionCleanupPrompt,
+  cleanupResultSchema,
+} from "./modes/cleanup";
 export { SYSTEM_PROMPT, type Prompt } from "./prompts/system";

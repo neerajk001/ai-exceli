@@ -38,6 +38,13 @@ export function toCode(
   return postAI({ ...request, mode: "toCode" }, options);
 }
 
+export function cleanup(
+  request: AIRequest,
+  options: RequestOptions = {},
+): Promise<AIResponse> {
+  return postAI({ ...request, mode: "cleanup" }, options);
+}
+
 async function postAI(
   request: AIRequest,
   options: RequestOptions,

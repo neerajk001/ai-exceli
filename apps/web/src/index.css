@@ -156,6 +156,15 @@ body {
   color: #eef2ff !important;
 }
 
+.ai-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #a1a1aa;
+  font-size: 12px;
+  cursor: pointer;
+}
+
 .ai-hint {
   color: #a1a1aa;
   font-size: 12px;

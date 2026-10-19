@@ -239,6 +239,42 @@ describe("applyOps", () => {
     expect(elements).toEqual(copy);
   });
 
+  it("keeps given geometry exactly when preserveGivenGeometry is set", () => {
+    const posts = graph.nodes.find((node) => node.id === postsId);
+
+    if (!posts) {
+      throw new Error("fixture is missing the posts node");
+    }
+
+    const result = applyOps(
+      elements,
+      [
+        {
+          type: "add_node",
+          node: {
+            id: "new_1",
+            kind: "rectangle",
+            text: "clean",
+            x: posts.x,
+            y: posts.y,
+            width: posts.width,
+            height: posts.height,
+          },
+        },
+      ],
+      { layout: placeNewNodes, preserveGivenGeometry: true },
+    );
+
+    const created = result.elements.find(
+      (element) => element.id === result.idMap.get("new_1"),
+    );
+
+    expect(created?.x).toBe(posts.x);
+    expect(created?.y).toBe(posts.y);
+    expect(created?.width).toBe(posts.width);
+    expect(created?.height).toBe(posts.height);
+  });
+
   it("appends the new elements after the existing ones", () => {
     const result = applyOps(
       elements,

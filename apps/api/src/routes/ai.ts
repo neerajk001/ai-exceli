@@ -6,6 +6,7 @@ import type { ZodError } from "zod";
 import { HttpError } from "../middleware/errorHandler";
 
 export const MAX_GRAPH_NODES = 300;
+export const MAX_IMAGE_BASE64_CHARS = 3_000_000;
 
 export function createAiRouter(llm: LLMClient): Router {
   const router = Router();
@@ -29,6 +30,25 @@ export function createAiRouter(llm: LLMClient): Router {
           413,
           "graph_too_large",
           `Graph has ${request.graph.nodes.length} nodes; the limit is ${MAX_GRAPH_NODES}.`,
+        );
+      }
+
+      if (request.imageBase64 !== undefined && request.mode !== "cleanup") {
+        throw new HttpError(
+          400,
+          "invalid_request",
+          "imageBase64 is only supported in cleanup mode.",
+        );
+      }
+
+      if (
+        request.imageBase64 !== undefined &&
+        request.imageBase64.length > MAX_IMAGE_BASE64_CHARS
+      ) {
+        throw new HttpError(
+          413,
+          "image_too_large",
+          `imageBase64 exceeds the ${MAX_IMAGE_BASE64_CHARS} character limit.`,
         );
       }
 

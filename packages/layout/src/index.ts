@@ -1,6 +1,8 @@
 import type { Graph, NewEdge, NewNode } from "@wb/shared-types";
 import dagre from "dagre";
 
+export { tidy } from "./tidy";
+
 export type LayoutFunction = (
   graph: Graph,
   newNodes: NewNode[],
