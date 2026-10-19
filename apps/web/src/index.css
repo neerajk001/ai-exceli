@@ -250,6 +250,48 @@ body {
   background: #32323a;
 }
 
+.dev-ops {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  max-width: 560px;
+  padding: 6px 8px;
+  border: 1px solid #3a3a42;
+  border-radius: 8px;
+  background: rgba(15, 15, 18, 0.9);
+  font-size: 12px;
+}
+
+.dev-ops-title {
+  color: #fbbf24;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dev-ops button {
+  padding: 4px 8px;
+  border: 1px solid #3a3a42;
+  border-radius: 6px;
+  background: #1c1c21;
+  color: #e4e4e7;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.dev-ops button:hover {
+  background: #26262c;
+}
+
+.dev-ops-log {
+  color: #a1a1aa;
+}
+
 .code-panel-content {
   margin: 0;
   padding: 10px 12px;

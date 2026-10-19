@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>seed</title>
+  </head>
+  <body>
+    <pre id="out">seeding</pre>
+    <script type="module">
+      import { convertToExcalidrawElements } from "@excalidraw/excalidraw";
+
+      const elements = convertToExcalidrawElements([
+        {
+          type: "rectangle",
+          id: "frontend",
+          x: 120,
+          y: 200,
+          width: 180,
+          height: 70,
+          label: { text: "Frontend" },
+        },
+        {
+          type: "rectangle",
+          id: "api",
+          x: 120,
+          y: 380,
+          width: 180,
+          height: 70,
+          label: { text: "API\nport 8080" },
+        },
+        {
+          type: "ellipse",
+          id: "db",
+          x: 120,
+          y: 560,
+          width: 180,
+          height: 70,
+          label: { text: "Database\npostgres" },
+        },
+        {
+          type: "arrow",
+          id: "fe_api",
+          x: 210,
+          y: 280,
+          start: { id: "frontend" },
+          end: { id: "api" },
+        },
+        {
+          type: "arrow",
+          id: "api_db",
+          x: 210,
+          y: 460,
+          start: { id: "api" },
+          end: { id: "db" },
+        },
+      ]);
+
+      localStorage.setItem("wb:scene:v0.2", JSON.stringify({ elements }));
+      document.getElementById("out").textContent = `seeded ${elements.length}`;
+    </script>
+  </body>
+</html>

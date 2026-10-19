@@ -18,7 +18,9 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@wb/shared-types": "workspace:*"
+    "@wb/layout": "workspace:*",
+    "@wb/shared-types": "workspace:*",
+    "fractional-indexing": "^4.0.0"
   },
   "devDependencies": {
     "@excalidraw/excalidraw": "^0.18.1",
