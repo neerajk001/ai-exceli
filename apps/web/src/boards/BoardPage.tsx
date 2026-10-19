@@ -15,6 +15,8 @@ import {
 } from "../api-client/client";
 import { Canvas } from "../canvas/Canvas";
 import { CanvasApiProvider } from "../canvas/CanvasApiContext";
+import { BoardFileMenu } from "./BoardFileMenu";
+import { TidyButton } from "./TidyButton";
 
 const AUTOSAVE_DELAY_MS = 2000;
 
@@ -195,6 +197,8 @@ export function BoardPage() {
               onChange={(event) => setTitle(event.target.value)}
               onBlur={() => void saveTitle()}
             />
+            <TidyButton />
+            <BoardFileMenu title={title} />
             <span className={`save-status save-${saveState}`}>
               {saveState === "saving" ? "Saving..." : null}
               {saveState === "saved" ? "Saved" : null}

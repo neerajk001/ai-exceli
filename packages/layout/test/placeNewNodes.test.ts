@@ -156,6 +156,31 @@ describe("placeNewNodes", () => {
     expect(placed?.y).toBe(900);
   });
 
+  it("lays out a brand-new diagram with dagre instead of stacking", () => {
+    const nodes: NewNode[] = [
+      { id: "a", kind: "rectangle", text: "A" },
+      { id: "b", kind: "rectangle", text: "B" },
+      { id: "c", kind: "rectangle", text: "C" },
+    ];
+    const edges: NewEdge[] = [
+      { id: "e1", from: "a", to: "b" },
+      { id: "e2", from: "a", to: "c" },
+    ];
+
+    const placed = placeNewNodes({ nodes: [], edges: [] }, nodes, edges);
+    const byId = new Map(placed.map((node) => [node.id, node]));
+    const a = byId.get("a");
+    const b = byId.get("b");
+    const c = byId.get("c");
+
+    if (!a || !b || !c) {
+      throw new Error("expected all nodes to be placed");
+    }
+
+    expect(b.x ?? 0).toBeGreaterThan(a.x ?? 0);
+    expect(b.y).not.toBe(c.y);
+  });
+
   it("is deterministic", () => {
     const newNodes: NewNode[] = [
       { id: "a", kind: "rectangle", text: "Cache" },

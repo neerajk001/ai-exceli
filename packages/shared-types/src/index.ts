@@ -59,7 +59,13 @@ export const opSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("delete"), id: z.string() }),
 ]);
 
-export const aiModeSchema = z.enum(["ask", "toCode", "cleanup", "collaborate"]);
+export const aiModeSchema = z.enum([
+  "ask",
+  "toCode",
+  "cleanup",
+  "collaborate",
+  "generate",
+]);
 
 export const CODE_TARGETS = [
   "prisma",

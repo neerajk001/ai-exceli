@@ -577,3 +577,51 @@ body {
   text-decoration: underline;
   cursor: pointer;
 }
+
+.file-format {
+  padding: 6px 8px;
+  border: 1px solid #3a3a42;
+  border-radius: 6px;
+  background: #1c1c21;
+  color: #e4e4e7;
+  font-size: 12px;
+}
+
+.board-header .page-button,
+.board-header .file-format {
+  flex: 0 0 auto;
+}
+
+.diagram-check {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #2a2a30;
+}
+
+.lint-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lint-issue {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #3a3a42;
+  border-radius: 6px;
+  background: #1c1c21;
+  color: #fca5a5;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lint-issue:hover {
+  background: #26262c;
+}

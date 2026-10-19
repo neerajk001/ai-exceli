@@ -7,6 +7,11 @@ export {
 } from "./llm";
 export { askResultSchema, buildAskPrompt, type AskResult } from "./modes/ask";
 export {
+  buildGeneratePrompt,
+  generateResultSchema,
+  MAX_GENERATE_OPS,
+} from "./modes/generate";
+export {
   buildToCodePrompt,
   codeResultSchema,
   isCodeTarget,

@@ -16,6 +16,7 @@ import { useCanvasApi } from "../canvas/CanvasApiContext";
 import { exportSceneImageBase64 } from "../canvas/exportImage";
 import { highlightElements } from "../canvas/highlight";
 import { CodePanel } from "./CodePanel";
+import { DiagramCheck } from "./DiagramCheck";
 import { useAI } from "./useAI";
 
 const MODES = [
@@ -23,6 +24,7 @@ const MODES = [
   { id: "toCode", label: "To code", enabled: true },
   { id: "cleanup", label: "Clean up", enabled: true },
   { id: "collaborate", label: "Collaborate", enabled: true },
+  { id: "generate", label: "Generate", enabled: true },
 ] as const;
 
 type ModeId = (typeof MODES)[number]["id"];
@@ -32,11 +34,12 @@ const SEND_LABELS: Record<ModeId, string> = {
   toCode: "Generate",
   cleanup: "Clean up",
   collaborate: "Draw",
+  generate: "Draw",
 };
 
 export function AIPanel() {
   const api = useCanvasApi();
-  const { loading, error, result, ask, toCode, cleanup, collaborate, cancel } =
+  const { loading, error, result, ask, toCode, cleanup, collaborate, generate, cancel } =
     useAI();
   const [mode, setMode] = useState<ModeId>("ask");
   const [target, setTarget] = useState<CodeTarget>("prisma");
@@ -109,7 +112,7 @@ export function AIPanel() {
 
     const graph = excalidrawToGraph(api.getSceneElements());
 
-    if (graph.nodes.length === 0) {
+    if (graph.nodes.length === 0 && mode !== "generate") {
       setHint("Draw something first.");
       return;
     }
@@ -118,6 +121,22 @@ export function AIPanel() {
 
     if (mode === "toCode") {
       await toCode(graph, target);
+      return;
+    }
+
+    if (mode === "generate") {
+      const description = input.trim();
+
+      if (!description) {
+        return;
+      }
+
+      const response = await generate(graph, description);
+
+      if (response?.ops?.length) {
+        await startPlayback(response.ops);
+      }
+
       return;
     }
 
@@ -212,9 +231,12 @@ export function AIPanel() {
   const placeholder =
     mode === "collaborate"
       ? 'e.g. "add a cache between the API and the DB"'
-      : 'Ask about your canvas, e.g. "what connects to the database?"';
+      : mode === "generate"
+        ? 'e.g. "draw an order service with a queue and a database"'
+        : 'Ask about your canvas, e.g. "what connects to the database?"';
 
-  const needsInput = mode === "ask" || mode === "collaborate";
+  const needsInput =
+    mode === "ask" || mode === "collaborate" || mode === "generate";
 
   return (
     <aside className="ai-panel" aria-label="AI panel">
@@ -327,6 +349,8 @@ export function AIPanel() {
       {!result?.code && result?.answer ? (
         <p className="ai-answer">{result.answer}</p>
       ) : null}
+
+      <DiagramCheck />
     </aside>
   );
 }

@@ -58,6 +58,13 @@ export function collaborate(
   return postAI({ ...request, mode: "collaborate" }, options);
 }
 
+export function generate(
+  request: AIRequest,
+  options: RequestOptions = {},
+): Promise<AIResponse> {
+  return postAI({ ...request, mode: "generate" }, options);
+}
+
 async function postAI(
   request: AIRequest,
   options: RequestOptions,

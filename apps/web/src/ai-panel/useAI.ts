@@ -5,6 +5,7 @@ import {
   askAI,
   cleanup as cleanupAI,
   collaborate as collaborateAI,
+  generate as generateAI,
   toCode,
 } from "../api-client/client";
 
@@ -114,12 +115,24 @@ export function useAI() {
     [run],
   );
 
+  const generate = useCallback(
+    (graph: Graph, instruction: string) =>
+      run((signal) =>
+        generateAI(
+          { mode: "generate", graph, input: instruction },
+          { signal },
+        ),
+      ),
+    [run],
+  );
+
   return {
     ...state,
     ask,
     toCode: generateCode,
     cleanup,
     collaborate,
+    generate,
     cancel,
   };
 }

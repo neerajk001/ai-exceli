@@ -114,6 +114,9 @@ export function placeNewNodes(
       if (anchor && anchorPosition && nodePosition) {
         x = nodePosition.x + (anchor.x - anchorPosition.x);
         y = nodePosition.y + (anchor.y - anchorPosition.y);
+      } else if (!bounds && nodePosition) {
+        x = nodePosition.x;
+        y = nodePosition.y;
       } else {
         x = bounds ? bounds.x + bounds.width + GAP : 0;
         y = bounds

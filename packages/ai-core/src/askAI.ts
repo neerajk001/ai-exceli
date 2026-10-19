@@ -18,6 +18,7 @@ import {
   buildCleanupPrompt,
   buildVisionCleanupPrompt,
 } from "./modes/cleanup";
+import { buildGeneratePrompt, MAX_GENERATE_OPS } from "./modes/generate";
 import { buildToCodePrompt, isCodeTarget } from "./modes/toCode";
 
 const SHAPE_KINDS: ReadonlySet<string> = new Set([
@@ -39,6 +40,8 @@ export async function askAI(
       return runCleanup(llm, request);
     case "collaborate":
       return runCollaborate(llm, request);
+    case "generate":
+      return runGenerate(llm, request);
   }
 }
 
@@ -140,6 +143,27 @@ async function runCollaborate(
   );
 }
 
+async function runGenerate(
+  llm: LLMClient,
+  request: AIRequest,
+): Promise<AIResponse> {
+  const description = request.input?.trim();
+
+  if (!description) {
+    throw new Error(
+      'Generate mode requires "input" (the diagram description)',
+    );
+  }
+
+  const prompt = buildGeneratePrompt(request.graph, description);
+
+  return generateValidated(
+    llm,
+    { system: prompt.system, user: prompt.user, jsonSchema: prompt.jsonSchema },
+    (raw) => parseGenerateResponse(raw, request.graph),
+  );
+}
+
 async function runCleanup(
   llm: LLMClient,
   request: AIRequest,
@@ -214,6 +238,81 @@ function parseCodeResponse(raw: unknown): ParseResult {
   }
 
   return { ok: true, value: { code } };
+}
+
+function parseGenerateResponse(raw: unknown, graph: Graph): ParseResult {
+  const parsed = aiResponseSchema.safeParse(raw);
+
+  if (!parsed.success) {
+    return { ok: false, message: formatIssues(parsed.error) };
+  }
+
+  if (!Array.isArray(parsed.data.ops)) {
+    return { ok: false, message: '"ops" must be an array of ops' };
+  }
+
+  if (
+    typeof parsed.data.answer !== "string" ||
+    parsed.data.answer.length === 0
+  ) {
+    return { ok: false, message: '"answer" must be a short narration string' };
+  }
+
+  const ops = sanitizeGenerateOps(parsed.data.ops, graph);
+
+  if (ops.length === 0) {
+    return { ok: false, message: "No usable add_node/add_edge ops were returned" };
+  }
+
+  return { ok: true, value: { ops, answer: parsed.data.answer } };
+}
+
+function sanitizeGenerateOps(ops: Op[], graph: Graph): Op[] {
+  const nodeIds = new Set(graph.nodes.map((node) => node.id));
+  const newIds = new Set<string>();
+
+  for (const op of ops) {
+    if (
+      op.type === "add_node" &&
+      SHAPE_KINDS.has(op.node.kind) &&
+      !nodeIds.has(op.node.id) &&
+      !newIds.has(op.node.id)
+    ) {
+      newIds.add(op.node.id);
+    }
+  }
+
+  const known = (id: string) => nodeIds.has(id) || newIds.has(id);
+  const seen = new Set<string>();
+  const kept: Op[] = [];
+
+  for (const op of ops) {
+    if (kept.length >= MAX_GENERATE_OPS) {
+      break;
+    }
+
+    if (op.type === "add_node") {
+      if (!newIds.has(op.node.id) || seen.has(op.node.id)) {
+        continue;
+      }
+
+      seen.add(op.node.id);
+      kept.push({
+        type: "add_node",
+        node: {
+          id: op.node.id,
+          kind: op.node.kind,
+          ...(op.node.text === undefined ? {} : { text: op.node.text }),
+        },
+      });
+    } else if (op.type === "add_edge") {
+      if (known(op.edge.from) && known(op.edge.to)) {
+        kept.push(op);
+      }
+    }
+  }
+
+  return kept;
 }
 
 function parseCollaborateResponse(raw: unknown, graph: Graph): ParseResult {
