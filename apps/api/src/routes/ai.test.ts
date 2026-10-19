@@ -4,6 +4,10 @@ import request from "supertest";
 import { describe, expect, it } from "vitest";
 
 import { createApp } from "../app";
+import {
+  createInMemoryBoardRepository,
+  createTestAuth,
+} from "../test-support/fakes";
 
 const graph: Graph = {
   nodes: [
@@ -30,7 +34,22 @@ const graph: Graph = {
 };
 
 function appWith(llm: LLMClient) {
-  return createApp({ llm, webOrigin: "http://localhost:3000" });
+  const { auth, ensureUser } = createTestAuth();
+
+  return createApp({
+    llm,
+    webOrigin: "http://localhost:3000",
+    auth,
+    ensureUser,
+    boards: createInMemoryBoardRepository(),
+  });
+}
+
+function postAi(llm: LLMClient, body: object) {
+  return request(appWith(llm))
+    .post("/ai")
+    .set("authorization", "Bearer token-a")
+    .send(body);
 }
 
 const answeringLlm: LLMClient = {
@@ -40,10 +59,21 @@ const answeringLlm: LLMClient = {
 };
 
 describe("POST /ai", () => {
-  it("returns 200 with the AI response for a valid request", async () => {
+  it("returns 401 without a bearer token", async () => {
     const response = await request(appWith(answeringLlm))
       .post("/ai")
-      .send({ mode: "ask", graph, input: "what connects to B?" });
+      .send({ mode: "ask", graph, input: "?" });
+
+    expect(response.status).toBe(401);
+    expect(response.body.error.code).toBe("unauthorized");
+  });
+
+  it("returns 200 with the AI response for a valid request", async () => {
+    const response = await postAi(answeringLlm, {
+      mode: "ask",
+      graph,
+      input: "what connects to B?",
+    });
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
@@ -53,9 +83,7 @@ describe("POST /ai", () => {
   });
 
   it("returns 400 with the error shape for an invalid body", async () => {
-    const response = await request(appWith(answeringLlm))
-      .post("/ai")
-      .send({ mode: "ask" });
+    const response = await postAi(answeringLlm, { mode: "ask" });
 
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe("invalid_request");
@@ -65,6 +93,7 @@ describe("POST /ai", () => {
   it("returns 400 for a body that is not JSON", async () => {
     const response = await request(appWith(answeringLlm))
       .post("/ai")
+      .set("authorization", "Bearer token-a")
       .set("content-type", "application/json")
       .send("this is not json");
 
@@ -82,9 +111,11 @@ describe("POST /ai", () => {
       height: 10,
     }));
 
-    const response = await request(appWith(answeringLlm))
-      .post("/ai")
-      .send({ mode: "ask", graph: { nodes, edges: [] }, input: "?" });
+    const response = await postAi(answeringLlm, {
+      mode: "ask",
+      graph: { nodes, edges: [] },
+      input: "?",
+    });
 
     expect(response.status).toBe(413);
     expect(response.body.error.code).toBe("graph_too_large");
@@ -98,9 +129,11 @@ describe("POST /ai", () => {
       },
     };
 
-    const response = await request(appWith(failingLlm))
-      .post("/ai")
-      .send({ mode: "ask", graph, input: "?" });
+    const response = await postAi(failingLlm, {
+      mode: "ask",
+      graph,
+      input: "?",
+    });
 
     expect(response.status).toBe(500);
     expect(response.body.error.code).toBe("internal_error");
@@ -117,9 +150,7 @@ describe("POST /ai", () => {
       },
     };
 
-    const response = await request(appWith(cleanupLlm))
-      .post("/ai")
-      .send({ mode: "cleanup", graph });
+    const response = await postAi(cleanupLlm, { mode: "cleanup", graph });
 
     expect(response.status).toBe(200);
     expect(response.body.ops).toEqual([
@@ -128,35 +159,34 @@ describe("POST /ai", () => {
   });
 
   it("returns 400 when an image is sent with a non-cleanup mode", async () => {
-    const response = await request(appWith(answeringLlm))
-      .post("/ai")
-      .send({ mode: "ask", graph, input: "?", imageBase64: "aGVsbG8=" });
+    const response = await postAi(answeringLlm, {
+      mode: "ask",
+      graph,
+      input: "?",
+      imageBase64: "aGVsbG8=",
+    });
 
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe("invalid_request");
   });
 
   it("returns 413 when imageBase64 exceeds the character limit", async () => {
-    const response = await request(appWith(answeringLlm))
-      .post("/ai")
-      .send({
-        mode: "cleanup",
-        graph,
-        imageBase64: "a".repeat(3_000_001),
-      });
+    const response = await postAi(answeringLlm, {
+      mode: "cleanup",
+      graph,
+      imageBase64: "a".repeat(3_000_001),
+    });
 
     expect(response.status).toBe(413);
     expect(response.body.error.code).toBe("image_too_large");
   });
 
   it("returns 413 when the body exceeds the limit", async () => {
-    const response = await request(appWith(answeringLlm))
-      .post("/ai")
-      .send({
-        mode: "cleanup",
-        graph,
-        imageBase64: "a".repeat(4_500_000),
-      });
+    const response = await postAi(answeringLlm, {
+      mode: "cleanup",
+      graph,
+      imageBase64: "a".repeat(6_500_000),
+    });
 
     expect(response.status).toBe(413);
     expect(response.body.error.code).toBe("payload_too_large");
@@ -177,9 +207,11 @@ describe("POST /ai", () => {
       },
     };
 
-    const response = await request(appWith(collaborateLlm))
-      .post("/ai")
-      .send({ mode: "collaborate", graph, input: "add a cache" });
+    const response = await postAi(collaborateLlm, {
+      mode: "collaborate",
+      graph,
+      input: "add a cache",
+    });
 
     expect(response.status).toBe(200);
     expect(response.body.answer).toBe("Added a cache box.");
@@ -187,9 +219,10 @@ describe("POST /ai", () => {
   });
 
   it("returns 500 when collaborate has no instruction", async () => {
-    const response = await request(appWith(answeringLlm))
-      .post("/ai")
-      .send({ mode: "collaborate", graph });
+    const response = await postAi(answeringLlm, {
+      mode: "collaborate",
+      graph,
+    });
 
     expect(response.status).toBe(500);
     expect(response.body.error.code).toBe("internal_error");

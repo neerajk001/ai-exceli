@@ -1,9 +1,9 @@
 import { askAI, type LLMClient } from "@wb/ai-core";
 import { aiRequestSchema, aiResponseSchema } from "@wb/shared-types";
 import { Router } from "express";
-import type { ZodError } from "zod";
 
 import { HttpError } from "../middleware/errorHandler";
+import { formatIssues } from "../validation";
 
 export const MAX_GRAPH_NODES = 300;
 export const MAX_IMAGE_BASE64_CHARS = 3_000_000;
@@ -69,10 +69,4 @@ export function createAiRouter(llm: LLMClient): Router {
   });
 
   return router;
-}
-
-function formatIssues(error: ZodError): string {
-  return error.issues
-    .map((issue) => `${issue.path.join(".") || "<root>"}: ${issue.message}`)
-    .join("; ");
 }

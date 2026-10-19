@@ -4,18 +4,34 @@ import express, { type Express } from "express";
 import { rateLimit } from "express-rate-limit";
 
 import { errorHandler } from "./middleware/errorHandler";
+import {
+  createRequireAuth,
+  type AuthUser,
+  type AuthVerifier,
+} from "./middleware/requireAuth";
+import type { BoardRepository } from "./repositories/boards";
 import { createAiRouter } from "./routes/ai";
+import { createBoardsRouter } from "./routes/boards";
 
 export type AppDependencies = {
   llm: LLMClient;
   webOrigin: string;
+  auth: AuthVerifier;
+  ensureUser: (user: AuthUser) => Promise<void>;
+  boards: BoardRepository;
 };
 
-export function createApp({ llm, webOrigin }: AppDependencies): Express {
+export function createApp({
+  llm,
+  webOrigin,
+  auth,
+  ensureUser,
+  boards,
+}: AppDependencies): Express {
   const app = express();
 
   app.use(cors({ origin: webOrigin }));
-  app.use(express.json({ limit: "4mb" }));
+  app.use(express.json({ limit: "6mb" }));
   app.use(
     rateLimit({
       windowMs: 60_000,
@@ -29,8 +45,10 @@ export function createApp({ llm, webOrigin }: AppDependencies): Express {
     res.json({ ok: true });
   });
 
-  // v11: `requireAuth` will be inserted here, before the AI routes.
-  app.use("/ai", createAiRouter(llm));
+  const requireAuth = createRequireAuth({ verifyToken: auth, ensureUser });
+
+  app.use("/ai", requireAuth, createAiRouter(llm));
+  app.use("/boards", requireAuth, createBoardsRouter(boards));
 
   app.use(errorHandler);
 

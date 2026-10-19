@@ -13,11 +13,13 @@
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.1",
+    "@supabase/supabase-js": "2.118.0",
     "@wb/layout": "workspace:*",
     "@wb/scene-graph": "workspace:*",
     "@wb/shared-types": "workspace:*",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "react-router-dom": "7.18.4"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",

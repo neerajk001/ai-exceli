@@ -1,19 +1,27 @@
 import { Excalidraw } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
-import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
-import { useCallback, useEffect, useRef, useState } from "react";
+import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
+import type {
+  AppState,
+  ExcalidrawImperativeAPI,
+  ExcalidrawInitialDataState,
+} from "@excalidraw/excalidraw/types";
+import { useCallback, useRef, useState } from "react";
 
 import { useSetCanvasApi } from "./CanvasApiContext";
-import { loadScene, saveScene } from "./storage";
 
-const SAVE_DEBOUNCE_MS = 500;
+type CanvasProps = {
+  initialData: ExcalidrawInitialDataState | null;
+  onChange?: (
+    elements: readonly OrderedExcalidrawElement[],
+    appState: AppState,
+  ) => void;
+};
 
-export function Canvas() {
+export function Canvas({ initialData, onChange }: CanvasProps) {
   const setApi = useSetCanvasApi();
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
-  const saveTimer = useRef<number | undefined>(undefined);
   const [elementCount, setElementCount] = useState(0);
-  const [initialData] = useState(() => loadScene());
 
   const handleExcalidrawApi = useCallback(
     (api: ExcalidrawImperativeAPI) => {
@@ -24,29 +32,16 @@ export function Canvas() {
     [setApi],
   );
 
-  const handleChange = useCallback(() => {
-    setElementCount(apiRef.current?.getSceneElements().length ?? 0);
-
-    if (saveTimer.current !== undefined) {
-      window.clearTimeout(saveTimer.current);
-    }
-
-    saveTimer.current = window.setTimeout(() => {
-      const elements = apiRef.current?.getSceneElements();
-
-      if (elements) {
-        saveScene(elements);
-      }
-    }, SAVE_DEBOUNCE_MS);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (saveTimer.current !== undefined) {
-        window.clearTimeout(saveTimer.current);
-      }
-    };
-  }, []);
+  const handleChange = useCallback(
+    (
+      elements: readonly OrderedExcalidrawElement[],
+      appState: AppState,
+    ) => {
+      setElementCount(elements.length);
+      onChange?.(elements, appState);
+    },
+    [onChange],
+  );
 
   return (
     <div className="canvas-wrapper">

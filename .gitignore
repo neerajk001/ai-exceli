@@ -27,6 +27,9 @@ out/
 build
 dist
 
+# Generated code
+apps/api/src/generated/
+
 
 # Debug
 npm-debug.log*

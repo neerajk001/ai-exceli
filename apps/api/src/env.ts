@@ -12,6 +12,15 @@ const envSchema = z.object({
     .string({ error: "LLM_API_KEY is required" })
     .min(1, "LLM_API_KEY must not be empty"),
   LLM_MODEL: z.string().min(1).default("gpt-4o-mini"),
+  SUPABASE_URL: z
+    .string({ error: "SUPABASE_URL is required" })
+    .url("SUPABASE_URL must be a valid URL"),
+  SUPABASE_ANON_KEY: z
+    .string({ error: "SUPABASE_ANON_KEY is required" })
+    .min(1, "SUPABASE_ANON_KEY must not be empty"),
+  DATABASE_URL: z
+    .string({ error: "DATABASE_URL is required" })
+    .min(1, "DATABASE_URL must not be empty"),
 });
 
 export type Env = z.infer<typeof envSchema>;

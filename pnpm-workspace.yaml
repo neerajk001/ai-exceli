@@ -2,7 +2,9 @@ packages:
   - "apps/*"
   - "packages/*"
 allowBuilds:
+  '@prisma/engines': true
   esbuild: true
+  prisma: true
 minimumReleaseAgeExclude:
   - '@turbo/darwin-64@2.11.9'
   - '@turbo/darwin-arm64@2.11.9'

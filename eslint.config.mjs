@@ -10,6 +10,7 @@ export default [
       "**/node_modules/**",
       "**/.turbo/**",
       "**/coverage/**",
+      "**/src/generated/**",
     ],
   },
   js.configs.recommended,
