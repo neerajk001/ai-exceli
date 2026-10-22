@@ -21,6 +21,19 @@ export type AppDependencies = {
   boards: BoardRepository;
 };
 
+export const AI_RATE_LIMIT = 20;
+export const BOARD_RATE_LIMIT = 120;
+export const RATE_LIMIT_WINDOW_MS = 60_000;
+
+function createLimiter(limit: number) {
+  return rateLimit({
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    limit,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+}
+
 export function createApp({
   llm,
   webOrigin,
@@ -30,16 +43,10 @@ export function createApp({
 }: AppDependencies): Express {
   const app = express();
 
+  app.set("trust proxy", 1);
+
   app.use(cors({ origin: webOrigin }));
   app.use(express.json({ limit: "6mb" }));
-  app.use(
-    rateLimit({
-      windowMs: 60_000,
-      limit: 20,
-      standardHeaders: true,
-      legacyHeaders: false,
-    }),
-  );
 
   app.get("/health", (_req, res) => {
     res.json({ ok: true });
@@ -47,8 +54,18 @@ export function createApp({
 
   const requireAuth = createRequireAuth({ verifyToken: auth, ensureUser });
 
-  app.use("/ai", requireAuth, createAiRouter(llm));
-  app.use("/boards", requireAuth, createBoardsRouter(boards));
+  app.use(
+    "/ai",
+    createLimiter(AI_RATE_LIMIT),
+    requireAuth,
+    createAiRouter(llm),
+  );
+  app.use(
+    "/boards",
+    createLimiter(BOARD_RATE_LIMIT),
+    requireAuth,
+    createBoardsRouter(boards),
+  );
 
   app.use(errorHandler);
 
