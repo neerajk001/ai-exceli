@@ -2,6 +2,7 @@ export type Prompt = {
   system: string;
   user: string;
   jsonSchema: Record<string, unknown>;
+  strict?: boolean;
 };
 
 export const SYSTEM_PROMPT = [

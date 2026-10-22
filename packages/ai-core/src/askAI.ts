@@ -18,7 +18,15 @@ import {
   buildCleanupPrompt,
   buildVisionCleanupPrompt,
 } from "./modes/cleanup";
-import { buildGeneratePrompt, MAX_GENERATE_OPS } from "./modes/generate";
+import {
+  buildGeneratePrompt,
+  buildSchemaPrompt,
+  generateLimits,
+  inferGenerateDepth,
+  isSchemaRequest,
+  normalizeSchemaOps,
+  type GenerateDepth,
+} from "./modes/generate";
 import { buildToCodePrompt, isCodeTarget } from "./modes/toCode";
 
 const SHAPE_KINDS: ReadonlySet<string> = new Set([
@@ -96,7 +104,7 @@ async function runAsk(llm: LLMClient, request: AIRequest): Promise<AIResponse> {
 
   return generateValidated(
     llm,
-    { system: prompt.system, user: prompt.user, jsonSchema: prompt.jsonSchema },
+    { system: prompt.system, user: prompt.user, jsonSchema: prompt.jsonSchema, strict: prompt.strict },
     (raw) => parseAskResponse(raw, request.graph),
   );
 }
@@ -117,7 +125,7 @@ async function runToCode(
 
   return generateValidated(
     llm,
-    { system: prompt.system, user: prompt.user, jsonSchema: prompt.jsonSchema },
+    { system: prompt.system, user: prompt.user, jsonSchema: prompt.jsonSchema, strict: prompt.strict },
     parseCodeResponse,
   );
 }
@@ -138,7 +146,7 @@ async function runCollaborate(
 
   return generateValidated(
     llm,
-    { system: prompt.system, user: prompt.user, jsonSchema: prompt.jsonSchema },
+    { system: prompt.system, user: prompt.user, jsonSchema: prompt.jsonSchema, strict: prompt.strict },
     (raw) => parseCollaborateResponse(raw, request.graph),
   );
 }
@@ -155,12 +163,28 @@ async function runGenerate(
     );
   }
 
-  const prompt = buildGeneratePrompt(request.graph, description);
+  const schemaMode = isSchemaRequest(description);
+  const depth = inferGenerateDepth(description);
+  const prompt = schemaMode
+    ? buildSchemaPrompt(request.graph, description)
+    : buildGeneratePrompt(request.graph, description, depth);
 
   return generateValidated(
     llm,
-    { system: prompt.system, user: prompt.user, jsonSchema: prompt.jsonSchema },
-    (raw) => parseGenerateResponse(raw, request.graph),
+    {
+      system: prompt.system,
+      user: prompt.user,
+      jsonSchema: prompt.jsonSchema,
+      strict: prompt.strict,
+    },
+    (raw) =>
+      parseGenerateResponse(
+        raw,
+        request.graph,
+        description,
+        depth,
+        schemaMode,
+      ),
   );
 }
 
@@ -177,6 +201,7 @@ async function runCleanup(
     system: prompt.system,
     user: prompt.user,
     jsonSchema: prompt.jsonSchema,
+    strict: prompt.strict,
     ...(vision ? { imageBase64 } : {}),
   };
 
@@ -240,7 +265,13 @@ function parseCodeResponse(raw: unknown): ParseResult {
   return { ok: true, value: { code } };
 }
 
-function parseGenerateResponse(raw: unknown, graph: Graph): ParseResult {
+function parseGenerateResponse(
+  raw: unknown,
+  graph: Graph,
+  instruction: string,
+  depth: GenerateDepth,
+  schemaMode: boolean,
+): ParseResult {
   const parsed = aiResponseSchema.safeParse(raw);
 
   if (!parsed.success) {
@@ -258,16 +289,281 @@ function parseGenerateResponse(raw: unknown, graph: Graph): ParseResult {
     return { ok: false, message: '"answer" must be a short narration string' };
   }
 
-  const ops = sanitizeGenerateOps(parsed.data.ops, graph);
+  const limits = schemaMode
+    ? generateLimits("technical")
+    : generateLimits(depth);
+  const sanitized = sanitizeGenerateOps(
+    parsed.data.ops,
+    graph,
+    limits.maxOps,
+    schemaMode,
+  );
+
+  if (schemaMode) {
+    const normalized = normalizeSchemaOps(sanitized, graph);
+
+    if (!normalized.ok) {
+      return { ok: false, message: normalized.message };
+    }
+
+    if (normalized.ops.length === 0) {
+      return {
+        ok: false,
+        message: "No usable schema tables or relationships were returned.",
+      };
+    }
+
+    return {
+      ok: true,
+      value: { ops: normalized.ops, answer: parsed.data.answer },
+    };
+  }
+
+  const ops = depth === "technical" ? pruneOrphans(sanitized) : sanitized;
 
   if (ops.length === 0) {
     return { ok: false, message: "No usable add_node/add_edge ops were returned" };
   }
 
+  const problem = findAudienceProblems(ops, graph, instruction, depth);
+
+  if (problem) {
+    return { ok: false, message: problem };
+  }
+
   return { ok: true, value: { ops, answer: parsed.data.answer } };
 }
 
-function sanitizeGenerateOps(ops: Op[], graph: Graph): Op[] {
+function findAudienceProblems(
+  ops: Op[],
+  graph: Graph,
+  instruction: string,
+  depth: GenerateDepth,
+): string | null {
+  const nodes = ops.filter((op) => op.type === "add_node");
+  const edges = ops.filter((op) => op.type === "add_edge");
+  const limits = generateLimits(depth);
+  const labelOf = (op: Extract<Op, { type: "add_node" }>) =>
+    (op.node.text ?? op.node.id).split("\n")[0]?.trim() ?? op.node.id;
+
+  if (nodes.length > limits.maxNodes) {
+    return `The diagram has ${nodes.length} nodes, but this request allows at most ${limits.maxNodes}. Remove optional detail.`;
+  }
+
+  if (depth === "technical" && nodes.length < 5) {
+    return "The request asks for technical depth; include the key services, storage, integrations and failure paths.";
+  }
+
+  const selfLoop = edges.find(
+    (op) => op.type === "add_edge" && op.edge.from === op.edge.to,
+  );
+
+  if (selfLoop && selfLoop.type === "add_edge") {
+    return `A concept points to itself ("${selfLoop.edge.from}"). Remove that edge.`;
+  }
+
+  if (depth !== "technical") {
+    const outOfScope = findOutOfScopeNodes(nodes, instruction);
+
+    if (outOfScope.length > 0) {
+      return `Remove advanced or unrelated components the user did not ask for: ${outOfScope.join(
+        ", ",
+      )}. Keep only the main flow.`;
+    }
+  }
+
+  if (nodes.length > 1) {
+    const connected = new Set<string>();
+
+    for (const op of edges) {
+      if (op.type === "add_edge") {
+        connected.add(op.edge.from);
+        connected.add(op.edge.to);
+      }
+    }
+
+    const orphans = nodes.filter(
+      (op) => op.type === "add_node" && !connected.has(op.node.id),
+    );
+
+    if (orphans.length > 0) {
+      return `These concepts are not connected to the main flow: ${orphans
+        .map((op) => (op.type === "add_node" ? labelOf(op) : ""))
+        .join(", ")}. Connect them or remove them.`;
+    }
+
+    const groups = countGroups(edges);
+
+    if (groups > 1) {
+      return `The diagram has ${groups} disconnected groups. Keep a single main flow.`;
+    }
+  }
+
+  const seen = new Map<string, string>();
+
+  for (const op of nodes) {
+    if (op.type !== "add_node") {
+      continue;
+    }
+
+    const key = (op.node.text ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+    const previous = seen.get(key);
+
+    if (key.length > 0 && previous !== undefined) {
+      return `"${labelOf(op)}" appears more than once (${previous}). Use each concept only once.`;
+    }
+
+    seen.set(key, labelOf(op));
+  }
+
+  const knownIds = new Set([
+    ...graph.nodes.map((node) => node.id),
+    ...nodes
+      .filter((op) => op.type === "add_node")
+      .map((op) => (op.type === "add_node" ? op.node.id : "")),
+  ]);
+
+  for (const op of edges) {
+    if (
+      op.type === "add_edge" &&
+      (!knownIds.has(op.edge.from) || !knownIds.has(op.edge.to))
+    ) {
+      return `An edge references an unknown node ("${op.edge.from}" -> "${op.edge.to}").`;
+    }
+  }
+
+  return null;
+}
+
+const ADVANCED_SCOPE_TERMS = [
+  "mfa",
+  "2fa",
+  "multi-factor",
+  "two-factor",
+  "sso",
+  "oauth",
+  "openid",
+  "saml",
+  "passkey",
+  "biometric",
+  "webauthn",
+  "magic link",
+  "risk engine",
+  "risk score",
+  "rate limit",
+  "audit",
+  "websocket",
+  "notification",
+  "push notification",
+  "sms",
+  "encryption key",
+  "token rotation",
+  "database",
+  "datastore",
+  "identity store",
+  "session store",
+  "recipient",
+  "recipient device",
+  "message queue",
+  "email delivery",
+];
+
+const LOGIN_METHOD_TERMS = new Set([
+  "mfa",
+  "2fa",
+  "multi-factor",
+  "two-factor",
+  "sso",
+  "oauth",
+  "openid",
+  "saml",
+  "passkey",
+  "biometric",
+  "webauthn",
+  "magic link",
+]);
+
+function findOutOfScopeNodes(
+  nodes: Extract<Op, { type: "add_node" }>[],
+  instruction: string,
+): string[] {
+  const asked = normalizeText(instruction);
+  const asksForLoginMethods =
+    /\b(login|sign[- ]?in|authentication|auth) methods?\b/i.test(instruction);
+  const flagged: string[] = [];
+
+  for (const op of nodes) {
+    const label = normalizeText(op.node.text ?? "");
+
+    if (
+      ADVANCED_SCOPE_TERMS.some(
+        (term) =>
+          label.includes(term) &&
+          !asked.includes(term) &&
+          !(asksForLoginMethods && LOGIN_METHOD_TERMS.has(term)),
+      )
+    ) {
+      flagged.push(`"${(op.node.text ?? op.node.id).replace(/\n/g, " ")}"`);
+    }
+  }
+
+  return flagged;
+}
+
+function normalizeText(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function countGroups(edges: Op[]): number {
+  const adjacency = new Map<string, Set<string>>();
+
+  for (const op of edges) {
+    if (op.type !== "add_edge" || op.edge.from === op.edge.to) {
+      continue;
+    }
+
+    const from = adjacency.get(op.edge.from) ?? new Set<string>();
+    from.add(op.edge.to);
+    adjacency.set(op.edge.from, from);
+
+    const to = adjacency.get(op.edge.to) ?? new Set<string>();
+    to.add(op.edge.from);
+    adjacency.set(op.edge.to, to);
+  }
+
+  const visited = new Set<string>();
+  let groups = 0;
+
+  for (const start of adjacency.keys()) {
+    if (visited.has(start)) {
+      continue;
+    }
+
+    groups += 1;
+    const queue = [start];
+    visited.add(start);
+
+    while (queue.length > 0) {
+      const current = queue.shift() ?? "";
+
+      for (const next of adjacency.get(current) ?? []) {
+        if (!visited.has(next)) {
+          visited.add(next);
+          queue.push(next);
+        }
+      }
+    }
+  }
+
+  return groups;
+}
+
+function sanitizeGenerateOps(
+  ops: Op[],
+  graph: Graph,
+  maxOps: number,
+  schemaMode = false,
+): Op[] {
   const nodeIds = new Set(graph.nodes.map((node) => node.id));
   const newIds = new Set<string>();
 
@@ -283,11 +579,13 @@ function sanitizeGenerateOps(ops: Op[], graph: Graph): Op[] {
   }
 
   const known = (id: string) => nodeIds.has(id) || newIds.has(id);
+  const allIds = new Set([...nodeIds, ...newIds]);
   const seen = new Set<string>();
+  const usedEdgeIds = new Set<string>();
   const kept: Op[] = [];
 
   for (const op of ops) {
-    if (kept.length >= MAX_GENERATE_OPS) {
+    if (kept.length >= maxOps) {
       break;
     }
 
@@ -301,18 +599,66 @@ function sanitizeGenerateOps(ops: Op[], graph: Graph): Op[] {
         type: "add_node",
         node: {
           id: op.node.id,
-          kind: op.node.kind,
+          kind: schemaMode ? "rectangle" : op.node.kind,
           ...(op.node.text === undefined ? {} : { text: op.node.text }),
+          ...(op.node.fields === undefined ? {} : { fields: op.node.fields }),
         },
       });
     } else if (op.type === "add_edge") {
       if (known(op.edge.from) && known(op.edge.to)) {
-        kept.push(op);
+        kept.push({
+          type: "add_edge",
+          edge: {
+            ...op.edge,
+            id: uniqueEdgeId(op.edge.id, allIds, usedEdgeIds),
+          },
+        });
       }
     }
   }
 
   return kept;
+}
+
+function uniqueEdgeId(
+  id: string,
+  nodeIds: ReadonlySet<string>,
+  used: Set<string>,
+): string {
+  let candidate = nodeIds.has(id) ? `edge_${id}` : id;
+  let suffix = 1;
+
+  while (used.has(candidate)) {
+    candidate = `edge_${id}_${suffix}`;
+    suffix += 1;
+  }
+
+  used.add(candidate);
+
+  return candidate;
+}
+
+/**
+ * Technical diagrams occasionally include a decorative leaf node with no
+ * connections. Drop those instead of failing the whole generation.
+ */
+function pruneOrphans(ops: Op[]): Op[] {
+  const connected = new Set<string>();
+
+  for (const op of ops) {
+    if (op.type === "add_edge") {
+      connected.add(op.edge.from);
+      connected.add(op.edge.to);
+    }
+  }
+
+  if (connected.size === 0) {
+    return ops;
+  }
+
+  return ops.filter(
+    (op) => op.type !== "add_node" || connected.has(op.node.id),
+  );
 }
 
 function parseCollaborateResponse(raw: unknown, graph: Graph): ParseResult {

@@ -50,6 +50,16 @@ pnpm dev
 | `pnpm lint`      | Lint every workspace               |
 | `pnpm test`      | Run the vitest suites              |
 | `pnpm format`    | Format with Prettier               |
+| `pnpm docker:build` | Build the production web/api images |
+| `pnpm docker:up`    | Start the Docker Compose stack      |
+| `pnpm docker:down`  | Stop the Docker Compose stack       |
+| `pnpm docker:logs`  | Follow Docker Compose logs          |
+
+## Deployment
+
+The app ships with production Dockerfiles, a Compose stack, and a GitHub
+Actions pipeline that tests, builds, publishes images to GHCR, and optionally
+deploys over SSH. See [`docs/deployment.md`](docs/deployment.md).
 
 ## Environment
 

@@ -1,6 +1,7 @@
 import { createLLMClient } from "@wb/ai-core";
 
 import { createApp } from "./app";
+import { withDevAuth } from "./auth/devAuth";
 import { createSupabaseAuthVerifier } from "./auth/supabase";
 import { createPrismaClient } from "./db";
 import { loadEnv, loadLocalEnvFile, type Env } from "./env";
@@ -20,11 +21,22 @@ function loadServerEnv(): Env {
 }
 
 const env = loadServerEnv();
+
+if (env.DEV_AUTH_TOKEN && process.env.NODE_ENV === "production") {
+  console.error(
+    "\n[api] DEV_AUTH_TOKEN is a development-only bypass and must not be set in production.\n",
+  );
+  process.exit(1);
+}
+
 const prisma = createPrismaClient(env.DATABASE_URL);
 const app = createApp({
   llm: createLLMClient(env),
   webOrigin: env.WEB_ORIGIN,
-  auth: createSupabaseAuthVerifier(env),
+  auth: withDevAuth(
+    createSupabaseAuthVerifier(env),
+    env.DEV_AUTH_TOKEN,
+  ),
   ensureUser: async (user) => {
     await prisma.user.upsert({
       where: { id: user.id },

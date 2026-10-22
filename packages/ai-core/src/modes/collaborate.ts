@@ -40,5 +40,6 @@ export function buildCollaboratePrompt(
       string,
       unknown
     >,
+    strict: false,
   };
 }

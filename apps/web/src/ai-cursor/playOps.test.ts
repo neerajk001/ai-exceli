@@ -7,7 +7,12 @@ import { playOps } from "./playOps";
 
 type UpdateCall = {
   elements?: readonly ExcalidrawElement[];
-  appState?: { viewModeEnabled?: boolean };
+  appState?: {
+    viewModeEnabled?: boolean;
+    zoom?: { value: number };
+    scrollX?: number;
+    scrollY?: number;
+  };
   collaborators?: Map<string, unknown>;
   captureUpdate?: string;
 };
@@ -47,13 +52,19 @@ function createMockApi(initial: ExcalidrawElement[]) {
   let elements: readonly ExcalidrawElement[] = initial;
   let appState = {
     viewModeEnabled: false,
+    width: 1200,
+    height: 800,
     collaborators: new Map<string, unknown>(),
   };
   const calls: UpdateCall[] = [];
+  const scrollCalls: Array<{ target: unknown; opts: unknown }> = [];
 
   const api = {
     getSceneElements: () => elements,
     getAppState: () => appState,
+    scrollToContent: (target: unknown, opts: unknown) => {
+      scrollCalls.push({ target, opts });
+    },
     updateScene: (data: UpdateCall) => {
       calls.push(data);
 
@@ -72,6 +83,7 @@ function createMockApi(initial: ExcalidrawElement[]) {
   return {
     api,
     calls,
+    scrollCalls,
     getElements: () => elements,
     getAppState: () => appState,
   };
@@ -136,6 +148,43 @@ describe("playOps", () => {
     );
   });
 
+  it("resolves temp ids across steps and draws the arrow", async () => {
+    vi.useFakeTimers();
+    const { api, getElements } = createMockApi([rectangle("a", 0, 0)]);
+    const ops: Op[] = [
+      {
+        type: "add_node",
+        node: { id: "new_1", kind: "rectangle", text: "B" },
+      },
+      { type: "add_edge", edge: { id: "new_e", from: "new_1", to: "a" } },
+    ];
+
+    const promise = playOps({ api, ops, moveDurationMs: 0, pauseMs: 0 });
+    await vi.advanceTimersByTimeAsync(100);
+    const result = await promise;
+
+    expect(result).toEqual({ applied: 2, skipped: 0, cancelled: false });
+
+    const elements = getElements();
+    const arrow = elements.find((element) => element.type === "arrow");
+
+    if (!arrow || arrow.type !== "arrow") {
+      throw new Error("expected an arrow");
+    }
+
+    const bindings = [
+      arrow.startBinding?.elementId,
+      arrow.endBinding?.elementId,
+    ];
+    const shape = elements.find(
+      (element) => element.type === "rectangle" && element.id !== "a",
+    );
+
+    expect(bindings).toContain("a");
+    expect(shape).toBeDefined();
+    expect(bindings).toContain(shape?.id);
+  });
+
   it("cancels cleanly on abort and leaves the board consistent", async () => {
     vi.useFakeTimers();
     const { api, calls, getElements, getAppState } = createMockApi([
@@ -178,6 +227,80 @@ describe("playOps", () => {
       (call) => call.captureUpdate === "IMMEDIATELY",
     );
     expect(captures).toHaveLength(1);
+  });
+
+  it("fits the viewport after playback when requested", async () => {
+    vi.useFakeTimers();
+    const { api, scrollCalls } = createMockApi([rectangle("a", 0, 0)]);
+
+    const promise = playOps({
+      api,
+      ops: [{ type: "update_node", id: "a", patch: { x: 20, y: 20 } }],
+      moveDurationMs: 0,
+      pauseMs: 0,
+      fitToViewport: true,
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    await promise;
+
+    expect(scrollCalls).toHaveLength(1);
+    expect(scrollCalls[0]?.opts).toMatchObject({
+      fitToContent: true,
+      animate: true,
+    });
+  });
+
+  it("uses a provided layout function", async () => {
+    vi.useFakeTimers();
+    const { api, getElements } = createMockApi([]);
+
+    const promise = playOps({
+      api,
+      ops: [
+        {
+          type: "add_node",
+          node: { id: "new_1", kind: "rectangle", text: "Hi" },
+        },
+      ],
+      moveDurationMs: 0,
+      pauseMs: 0,
+      layout: (_graph, nodes) =>
+        nodes.map((node) => ({
+          ...node,
+          x: 700,
+          y: 500,
+          width: 120,
+          height: 60,
+        })),
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    await promise;
+
+    const shape = getElements().find((element) => element.type === "rectangle");
+
+    expect(shape?.x).toBe(700);
+    expect(shape?.y).toBe(500);
+  });
+
+  it("fits large diagrams without clipping", async () => {
+    vi.useFakeTimers();
+    const { api, scrollCalls } = createMockApi([
+      rectangle("a", 0, 0),
+      rectangle("b", 6000, 0),
+    ]);
+
+    const promise = playOps({
+      api,
+      ops: [{ type: "update_node", id: "a", patch: { x: 0, y: 0 } }],
+      moveDurationMs: 0,
+      pauseMs: 0,
+      fitToViewport: true,
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    await promise;
+
+    expect(scrollCalls).toHaveLength(1);
+    expect(scrollCalls[0]?.opts).toMatchObject({ fitToContent: true });
   });
 
   it("reports skipped ops but keeps playing", async () => {

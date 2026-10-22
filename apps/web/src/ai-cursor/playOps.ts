@@ -6,9 +6,9 @@ import type {
   ExcalidrawImperativeAPI,
   SocketId,
 } from "@excalidraw/excalidraw/types";
-import { placeNewNodes } from "@wb/layout";
-import { applyOps } from "@wb/scene-graph";
-import type { Op } from "@wb/shared-types";
+import { placeNewNodes, type LayoutFunction } from "@wb/layout";
+import { applyOps, excalidrawToGraph } from "@wb/scene-graph";
+import type { NewNode, Op } from "@wb/shared-types";
 
 const EVENTUALLY: CaptureUpdateActionType = "EVENTUALLY";
 const IMMEDIATELY: CaptureUpdateActionType = "IMMEDIATELY";
@@ -28,6 +28,8 @@ export type PlayOpsOptions = {
   signal?: AbortSignal;
   moveDurationMs?: number;
   pauseMs?: number;
+  fitToViewport?: boolean;
+  layout?: LayoutFunction;
 };
 
 export type PlayOpsResult = {
@@ -52,14 +54,22 @@ export async function playOps(options: PlayOpsOptions): Promise<PlayOpsResult> {
   let skipped = 0;
   let cancelled = false;
 
+  const plannedNodes = planNodes(
+    elements,
+    ops,
+    options.layout ?? placeNewNodes,
+  );
+  const tempIds = new Map<string, string>();
+
   api.updateScene({ appState: { viewModeEnabled: true } });
 
   try {
-    for (const op of ops) {
+    for (const rawOp of ops) {
       throwIfAborted(signal);
 
+      const op = prepareOp(rawOp, tempIds, plannedNodes);
       const step = applyOps(elements, [op], {
-        layout: placeNewNodes,
+        layout: options.layout ?? placeNewNodes,
         preserveGivenGeometry: true,
       });
       const target = targetPoint(op, step, elements);
@@ -73,6 +83,10 @@ export async function playOps(options: PlayOpsOptions): Promise<PlayOpsResult> {
         elements: step.elements as unknown as OrderedExcalidrawElement[],
         captureUpdate: EVENTUALLY,
       });
+
+      for (const [tempId, realId] of step.idMap) {
+        tempIds.set(tempId, realId);
+      }
 
       elements = step.elements;
       applied += 1;
@@ -95,7 +109,74 @@ export async function playOps(options: PlayOpsOptions): Promise<PlayOpsResult> {
     api.updateScene({ appState: { viewModeEnabled: originalViewMode } });
   }
 
+  if (options.fitToViewport && !cancelled) {
+    api.scrollToContent(api.getSceneElements(), {
+      fitToContent: true,
+      animate: true,
+      duration: 400,
+    });
+  }
+
   return { applied, skipped, cancelled };
+}
+
+function planNodes(
+  elements: readonly ExcalidrawElement[],
+  ops: readonly Op[],
+  layout: LayoutFunction,
+): Map<string, NewNode> {
+  const newNodes = ops
+    .filter((op) => op.type === "add_node")
+    .map((op) => op.node);
+  const newEdges = ops
+    .filter((op) => op.type === "add_edge")
+    .map((op) => op.edge);
+
+  if (newNodes.length === 0) {
+    return new Map();
+  }
+
+  const placed = layout(excalidrawToGraph(elements), newNodes, newEdges);
+
+  return new Map(placed.map((node) => [node.id, node]));
+}
+
+function prepareOp(
+  op: Op,
+  tempIds: Map<string, string>,
+  plannedNodes: Map<string, NewNode>,
+): Op {
+  if (op.type === "add_node") {
+    const planned = plannedNodes.get(op.node.id);
+
+    if (!planned || op.node.x !== undefined || op.node.y !== undefined) {
+      return op;
+    }
+
+    return {
+      type: "add_node",
+      node: {
+        ...op.node,
+        x: planned.x,
+        y: planned.y,
+        width: planned.width,
+        height: planned.height,
+      },
+    };
+  }
+
+  if (op.type === "add_edge") {
+    return {
+      type: "add_edge",
+      edge: {
+        ...op.edge,
+        from: tempIds.get(op.edge.from) ?? op.edge.from,
+        to: tempIds.get(op.edge.to) ?? op.edge.to,
+      },
+    };
+  }
+
+  return { ...op, id: tempIds.get(op.id) ?? op.id };
 }
 
 function startPoint(elements: readonly ExcalidrawElement[]): Point {

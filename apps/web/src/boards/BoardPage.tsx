@@ -6,21 +6,17 @@ import type {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import { AIPanel } from "../ai-panel/AIPanel";
+import { AIWorkspaceProvider } from "../ai-panel/AIWorkspaceContext";
 import {
   getBoard,
   updateBoard,
   type Board,
   type BoardScene,
 } from "../api-client/client";
-import { Canvas } from "../canvas/Canvas";
 import { CanvasApiProvider } from "../canvas/CanvasApiContext";
-import { BoardFileMenu } from "./BoardFileMenu";
-import { TidyButton } from "./TidyButton";
+import { BoardWorkspace, type SaveState } from "./BoardWorkspace";
 
 const AUTOSAVE_DELAY_MS = 2000;
-
-type SaveState = "idle" | "saving" | "saved" | "error";
 
 export function BoardPage() {
   const { id = "" } = useParams();
@@ -183,36 +179,17 @@ export function BoardPage() {
 
   return (
     <CanvasApiProvider>
-      <div className="app-shell">
-        <div className="canvas-area">
-          <header className="board-header">
-            <Link className="board-back" to="/boards">
-              Boards
-            </Link>
-            <input
-              className="board-title"
-              value={title}
-              maxLength={120}
-              aria-label="Board title"
-              onChange={(event) => setTitle(event.target.value)}
-              onBlur={() => void saveTitle()}
-            />
-            <TidyButton />
-            <BoardFileMenu title={title} />
-            <span className={`save-status save-${saveState}`}>
-              {saveState === "saving" ? "Saving..." : null}
-              {saveState === "saved" ? "Saved" : null}
-              {saveState === "error" ? (
-                <button type="button" onClick={handleRetry}>
-                  Save failed — retry
-                </button>
-              ) : null}
-            </span>
-          </header>
-          <Canvas initialData={initialData} onChange={handleSceneChange} />
-        </div>
-        <AIPanel />
-      </div>
+      <AIWorkspaceProvider>
+        <BoardWorkspace
+          title={title}
+          onTitleChange={setTitle}
+          onTitleBlur={() => void saveTitle()}
+          saveState={saveState}
+          onRetrySave={handleRetry}
+          initialData={initialData}
+          onSceneChange={handleSceneChange}
+        />
+      </AIWorkspaceProvider>
     </CanvasApiProvider>
   );
 }

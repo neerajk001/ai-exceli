@@ -9,6 +9,33 @@ export const nodeKindSchema = z.enum([
   "other",
 ]);
 
+export const cardinalitySchema = z.enum([
+  "one-to-one",
+  "one-to-many",
+  "many-to-many",
+]);
+
+export const schemaFieldSchema = z.object({
+  name: z.string().min(1),
+  type: z.string().min(1),
+  primaryKey: z.boolean().optional(),
+  foreignKey: z
+    .object({
+      table: z.string().min(1),
+      field: z.string().min(1),
+    })
+    .optional(),
+  unique: z.boolean().optional(),
+  nullable: z.boolean().optional(),
+  default: z.string().optional(),
+});
+
+export const schemaRelationshipSchema = z.object({
+  fromField: z.string().min(1).optional(),
+  toField: z.string().min(1).optional(),
+  cardinality: cardinalitySchema.optional(),
+});
+
 export const nodeSchema = z.object({
   id: z.string(),
   kind: nodeKindSchema,
@@ -17,6 +44,7 @@ export const nodeSchema = z.object({
   y: z.number(),
   width: z.number(),
   height: z.number(),
+  fields: z.array(schemaFieldSchema).optional(),
 });
 
 export const newNodeSchema = z.object({
@@ -27,6 +55,7 @@ export const newNodeSchema = z.object({
   y: z.number().optional(),
   width: z.number().optional(),
   height: z.number().optional(),
+  fields: z.array(schemaFieldSchema).optional(),
 });
 
 export const edgeSchema = z.object({
@@ -34,6 +63,9 @@ export const edgeSchema = z.object({
   from: z.string(),
   to: z.string(),
   label: z.string().optional(),
+  fromField: z.string().optional(),
+  toField: z.string().optional(),
+  cardinality: cardinalitySchema.optional(),
 });
 
 export const newEdgeSchema = z.object({
@@ -41,6 +73,9 @@ export const newEdgeSchema = z.object({
   from: z.string(),
   to: z.string(),
   label: z.string().optional(),
+  fromField: z.string().optional(),
+  toField: z.string().optional(),
+  cardinality: cardinalitySchema.optional(),
 });
 
 export const graphSchema = z.object({
@@ -97,6 +132,9 @@ export const aiResponseSchema = z.object({
 });
 
 export type NodeKind = z.infer<typeof nodeKindSchema>;
+export type SchemaField = z.infer<typeof schemaFieldSchema>;
+export type Cardinality = z.infer<typeof cardinalitySchema>;
+export type SchemaRelationship = z.infer<typeof schemaRelationshipSchema>;
 export type Node = z.infer<typeof nodeSchema>;
 export type NewNode = z.infer<typeof newNodeSchema>;
 export type Edge = z.infer<typeof edgeSchema>;

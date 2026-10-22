@@ -1,0 +1,217 @@
+[
+  {
+    "type": "add_node",
+    "node": {
+      "id": "wb_3424d8fad46c400b",
+      "kind": "ellipse",
+      "text": "User request"
+    }
+  },
+  {
+    "type": "add_node",
+    "node": {
+      "id": "wb_33286901d73444ca",
+      "kind": "rectangle",
+      "text": "AI agent"
+    }
+  },
+  {
+    "type": "add_node",
+    "node": {
+      "id": "wb_d1201e1489464d0c",
+      "kind": "diamond",
+      "text": "Need a tool?"
+    }
+  },
+  {
+    "type": "add_node",
+    "node": {
+      "id": "wb_82d0fadf6b83421f",
+      "kind": "rectangle",
+      "text": "Call tool"
+    }
+  },
+  {
+    "type": "add_node",
+    "node": {
+      "id": "wb_1ae2ad9427bc4a88",
+      "kind": "ellipse",
+      "text": "Tool result\n(cache & observe)"
+    }
+  },
+  {
+    "type": "add_node",
+    "node": {
+      "id": "wb_e112456926f446c4",
+      "kind": "rectangle",
+      "text": "Handle failure"
+    }
+  },
+  {
+    "type": "add_node",
+    "node": {
+      "id": "wb_89e8573479284b65",
+      "kind": "rectangle",
+      "text": "Final response"
+    }
+  },
+  {
+    "type": "add_node",
+    "node": {
+      "id": "wb_12628ec3b8e7425e",
+      "kind": "rectangle",
+      "text": "Validate & prioritize"
+    }
+  },
+  {
+    "type": "add_node",
+    "node": {
+      "id": "wb_08812fd07e2549f9",
+      "kind": "rectangle",
+      "text": "Check cache"
+    }
+  },
+  {
+    "type": "add_node",
+    "node": {
+      "id": "wb_88ebd99b55ca4ec9",
+      "kind": "rectangle",
+      "text": "Retry transient failure"
+    }
+  },
+  {
+    "type": "add_edge",
+    "edge": {
+      "id": "wb_570beb0c839541cd",
+      "from": "wb_3424d8fad46c400b",
+      "to": "wb_33286901d73444ca",
+      "label": "send request"
+    }
+  },
+  {
+    "type": "add_edge",
+    "edge": {
+      "id": "wb_000a5b2fc65c4fd4",
+      "from": "wb_33286901d73444ca",
+      "to": "wb_d1201e1489464d0c",
+      "label": "decide"
+    }
+  },
+  {
+    "type": "add_edge",
+    "edge": {
+      "id": "wb_f8bf5df1c53e4054",
+      "from": "wb_d1201e1489464d0c",
+      "to": "wb_89e8573479284b65",
+      "label": "no tool"
+    }
+  },
+  {
+    "type": "add_edge",
+    "edge": {
+      "id": "wb_3b05f5fb5e0a4026",
+      "from": "wb_d1201e1489464d0c",
+      "to": "wb_82d0fadf6b83421f",
+      "label": "yes"
+    }
+  },
+  {
+    "type": "add_edge",
+    "edge": {
+      "id": "wb_38b75416a5a649a4",
+      "from": "wb_82d0fadf6b83421f",
+      "to": "wb_1ae2ad9427bc4a88",
+      "label": "success"
+    }
+  },
+  {
+    "type": "add_edge",
+    "edge": {
+      "id": "wb_dafedcd3422d4669",
+      "from": "wb_1ae2ad9427bc4a88",
+      "to": "wb_33286901d73444ca",
+      "label": "observe"
+    }
+  },
+  {
+    "type": "add_edge",
+    "edge": {
+      "id": "wb_05d76919494c49ec",
+      "from": "wb_82d0fadf6b83421f",
+      "to": "wb_e112456926f446c4",
+      "label": "failure"
+    }
+  },
+  {
+    "type": "add_edge",
+    "edge": {
+      "id": "wb_c11fcd270d82449b",
+      "from": "wb_e112456926f446c4",
+      "to": "wb_89e8573479284b65",
+      "label": "respond safely"
+    }
+  },
+  {
+    "type": "add_edge",
+    "edge": {
+      "id": "wb_d92d31d23d534e6e",
+      "from": "wb_33286901d73444ca",
+      "to": "wb_89e8573479284b65",
+      "label": "compose answer"
+    }
+  },
+  {
+    "type": "add_edge",
+    "edge": {
+      "id": "wb_cdfa1da8df7a48f6",
+      "from": "wb_3424d8fad46c400b",
+      "to": "wb_12628ec3b8e7425e",
+      "label": "validate"
+    }
+  },
+  {
+    "type": "add_edge",
+    "edge": {
+      "id": "wb_2694f70efd0245ae",
+      "from": "wb_12628ec3b8e7425e",
+      "to": "wb_33286901d73444ca",
+      "label": "prioritize"
+    }
+  },
+  {
+    "type": "add_edge",
+    "edge": {
+      "id": "wb_8c0b6fe2c14c49f4",
+      "from": "wb_33286901d73444ca",
+      "to": "wb_08812fd07e2549f9",
+      "label": "lookup"
+    }
+  },
+  {
+    "type": "add_edge",
+    "edge": {
+      "id": "wb_80a314c7050f4950",
+      "from": "wb_08812fd07e2549f9",
+      "to": "wb_d1201e1489464d0c",
+      "label": "cache miss"
+    }
+  },
+  {
+    "type": "add_edge",
+    "edge": {
+      "id": "wb_2b5e72a4ff974dcf",
+      "from": "wb_e112456926f446c4",
+      "to": "wb_88ebd99b55ca4ec9",
+      "label": "retry"
+    }
+  },
+  {
+    "type": "add_edge",
+    "edge": {
+      "id": "wb_bc1d5d1f46b0495f",
+      "from": "wb_88ebd99b55ca4ec9",
+      "to": "wb_82d0fadf6b83421f",
+      "label": "backoff"
+    }
+  }
+]

@@ -15,7 +15,11 @@ const SHAPE_KINDS: ReadonlySet<Node["kind"]> = new Set([
 ]);
 
 export function tidy(graph: Graph): Op[] {
-  const shapes = graph.nodes.filter((node) => SHAPE_KINDS.has(node.kind));
+  const shapes = graph.nodes.filter(
+    (node) =>
+      SHAPE_KINDS.has(node.kind) &&
+      !(node.fields && node.fields.length > 0),
+  );
 
   if (shapes.length === 0) {
     return [];

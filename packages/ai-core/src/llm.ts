@@ -8,6 +8,7 @@ export type LLMGenerateParams = {
   user: string;
   jsonSchema: Record<string, unknown>;
   imageBase64?: string;
+  strict?: boolean;
 };
 
 export interface LLMClient {
@@ -54,7 +55,7 @@ function createOpenAIClient(options: OpenAIClientOptions): LLMClient {
   const url = `${options.baseUrl ?? "https://api.openai.com/v1"}/chat/completions`;
 
   return {
-    async generate({ system, user, jsonSchema, imageBase64 }) {
+    async generate({ system, user, jsonSchema, imageBase64, strict }) {
       const userContent = imageBase64
         ? [
             { type: "text", text: user },
@@ -78,7 +79,7 @@ function createOpenAIClient(options: OpenAIClientOptions): LLMClient {
             type: "json_schema",
             json_schema: {
               name: "result",
-              strict: true,
+              strict: strict ?? true,
               schema: withoutMetaKeys(jsonSchema),
             },
           },

@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+import { CodeIcon, CopyIcon, DownloadIcon } from "./icons";
+
 const FILE_NAMES: Record<string, string> = {
   prisma: "schema.prisma",
   sql: "schema.sql",
@@ -13,11 +15,14 @@ type CodePanelProps = {
     language: string;
     content: string;
   };
+  fileName?: string;
 };
 
-export function CodePanel({ code }: CodePanelProps) {
+export function CodePanel({ code, fileName }: CodePanelProps) {
   const [copied, setCopied] = useState(false);
-  const fileName = FILE_NAMES[code.language] ?? `${code.language}.txt`;
+  const resolvedFileName =
+    fileName ?? FILE_NAMES[code.language] ?? `${code.language}.txt`;
+  const lines = code.content.split("\n");
 
   const handleCopy = async () => {
     try {
@@ -34,7 +39,7 @@ export function CodePanel({ code }: CodePanelProps) {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = fileName;
+    anchor.download = resolvedFileName;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -42,24 +47,35 @@ export function CodePanel({ code }: CodePanelProps) {
   };
 
   return (
-    <div className="code-panel">
-      <div className="code-panel-header">
-        <span className="code-panel-language">{fileName}</span>
-        <div className="code-panel-actions">
-          <button type="button" className="code-copy" onClick={handleCopy}>
-            {copied ? "Copied" : "Copy"}
+    <div className="bw-code">
+      <div className="bw-code-head">
+        <div className="bw-code-file">
+          <span className="bw-code-file-icon">
+            <CodeIcon size={14} />
+          </span>
+          <span className="bw-code-name">{resolvedFileName}</span>
+          <span className="bw-code-badge">Generated</span>
+        </div>
+        <div className="bw-code-actions">
+          <button type="button" onClick={handleCopy}>
+            <CopyIcon size={13} /> {copied ? "Copied" : "Copy"}
           </button>
-          <button
-            type="button"
-            className="code-download"
-            onClick={handleDownload}
-          >
-            Download
+          <button type="button" onClick={handleDownload}>
+            <DownloadIcon size={13} /> Download
           </button>
         </div>
       </div>
-      <pre className="code-panel-content">
-        <code>{code.content}</code>
+      <pre className="bw-code-body" aria-label={`${code.language} output`}>
+        <code>
+          {lines.map((line, index) => (
+            <span key={index} className="bw-code-line">
+              <span className="bw-code-line-no" aria-hidden="true">
+                {index + 1}
+              </span>
+              <span className="bw-code-text">{line === "" ? " " : line}</span>
+            </span>
+          ))}
+        </code>
       </pre>
     </div>
   );

@@ -21,6 +21,7 @@ const envSchema = z.object({
   DATABASE_URL: z
     .string({ error: "DATABASE_URL is required" })
     .min(1, "DATABASE_URL must not be empty"),
+  DEV_AUTH_TOKEN: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

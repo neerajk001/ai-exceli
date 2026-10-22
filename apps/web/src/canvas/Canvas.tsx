@@ -6,7 +6,7 @@ import type {
   ExcalidrawImperativeAPI,
   ExcalidrawInitialDataState,
 } from "@excalidraw/excalidraw/types";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useSetCanvasApi } from "./CanvasApiContext";
 
@@ -21,7 +21,9 @@ type CanvasProps = {
 export function Canvas({ initialData, onChange }: CanvasProps) {
   const setApi = useSetCanvasApi();
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
+  const fittedInitialView = useRef(false);
   const [elementCount, setElementCount] = useState(0);
+  const shouldFitInitialView = (initialData?.elements?.length ?? 0) > 0;
 
   const handleExcalidrawApi = useCallback(
     (api: ExcalidrawImperativeAPI) => {
@@ -31,6 +33,38 @@ export function Canvas({ initialData, onChange }: CanvasProps) {
     },
     [setApi],
   );
+
+  useEffect(() => {
+    if (
+      !shouldFitInitialView ||
+      fittedInitialView.current ||
+      elementCount === 0
+    ) {
+      return undefined;
+    }
+
+    const api = apiRef.current;
+
+    if (!api) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      const elements = api.getSceneElements();
+
+      if (elements.length === 0) {
+        return;
+      }
+
+      fittedInitialView.current = true;
+      api.scrollToContent(elements, {
+        fitToViewport: true,
+        animate: false,
+      });
+    }, 160);
+
+    return () => window.clearTimeout(timer);
+  }, [elementCount, shouldFitInitialView]);
 
   const handleChange = useCallback(
     (

@@ -31,6 +31,7 @@ export function buildCleanupPrompt(graph: Graph): Prompt {
     system: `${SYSTEM_PROMPT}\nYou clean up rough diagrams: fix labels, correct shape kinds, and add obviously missing connections.`,
     user,
     jsonSchema: z.toJSONSchema(cleanupResultSchema) as Record<string, unknown>,
+    strict: false,
   };
 }
 
@@ -60,5 +61,6 @@ export function buildVisionCleanupPrompt(graph: Graph): Prompt {
     system: `${SYSTEM_PROMPT}\nYou convert hand-drawn strokes into clean shapes and arrows by looking at an image of the canvas.`,
     user,
     jsonSchema: z.toJSONSchema(cleanupResultSchema) as Record<string, unknown>,
+    strict: false,
   };
 }

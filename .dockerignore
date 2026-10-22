@@ -1,0 +1,14 @@
+.git
+.github
+.commandcode
+.turbo
+**/node_modules
+**/dist
+**/coverage
+**/.turbo
+apps/api/src/generated
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store

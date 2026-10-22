@@ -1,4 +1,4 @@
-import type { Session, User } from "@supabase/supabase-js";
+import type { Session } from "@supabase/supabase-js";
 import {
   createContext,
   useContext,
@@ -11,8 +11,10 @@ import {
 import { setAuthToken } from "../api-client/client";
 import { supabase } from "./supabase";
 
+export type AuthUser = { id: string; email: string };
+
 type AuthContextValue = {
-  user: User | null;
+  user: AuthUser | null;
   session: Session | null;
   loading: boolean;
   signOut: () => Promise<void>;
@@ -20,11 +22,23 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+const DEV_TOKEN = import.meta.env.DEV
+  ? (import.meta.env.VITE_DEV_AUTH_TOKEN ?? null)
+  : null;
+
+const DEV_USER: AuthUser = { id: "dev-user", email: "dev@local" };
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (DEV_TOKEN) {
+      setAuthToken(DEV_TOKEN);
+      setLoading(false);
+      return undefined;
+    }
+
     if (!supabase) {
       setLoading(false);
       return undefined;
@@ -56,17 +70,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      user: session?.user ?? null,
+  const value = useMemo<AuthContextValue>(() => {
+    const user: AuthUser | null = DEV_TOKEN
+      ? DEV_USER
+      : session
+        ? {
+            id: session.user.id,
+            email: session.user.email ?? "",
+          }
+        : null;
+
+    return {
+      user,
       session,
       loading,
       signOut: async () => {
+        if (DEV_TOKEN) {
+          return;
+        }
+
         await supabase?.auth.signOut();
       },
-    }),
-    [session, loading],
-  );
+    };
+  }, [session, loading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
